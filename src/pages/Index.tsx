@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { ChatContainer } from "@/components/ChatContainer";
 import { ChatInput } from "@/components/ChatInput";
 import { useToast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { LogOut } from "lucide-react";
 
 interface Message {
   content: string;
@@ -14,7 +17,6 @@ const Index = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Load initial welcome message
     setMessages([
       {
         content: "Hi! I'm CHICHA, your friendly AI assistant. How can I help you today?",
@@ -24,12 +26,10 @@ const Index = () => {
   }, []);
 
   const handleSendMessage = async (content: string) => {
-    // Add user message
     setMessages((prev) => [...prev, { content, isBot: false }]);
     setIsLoading(true);
 
     try {
-      // Simulate AI response for now - we'll integrate OpenAI later
       const response = "I'm currently in development, but I'll be able to help you soon!";
       
       setTimeout(() => {
@@ -46,11 +46,21 @@ const Index = () => {
     }
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
+
   return (
     <div className="flex h-screen flex-col bg-background p-4">
-      <div className="mb-4 text-center">
-        <h1 className="text-2xl font-bold text-primary">CHICHA</h1>
-        <p className="text-sm text-muted-foreground">Your AI Assistant</p>
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-primary">CHICHA</h1>
+          <p className="text-sm text-muted-foreground">Your AI Assistant</p>
+        </div>
+        <Button variant="outline" onClick={handleLogout}>
+          <LogOut className="mr-2 h-4 w-4" />
+          Logout
+        </Button>
       </div>
       
       <div className="flex-1 overflow-hidden rounded-lg border bg-card shadow-sm">
