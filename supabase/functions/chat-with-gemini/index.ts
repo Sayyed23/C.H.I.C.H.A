@@ -19,9 +19,25 @@ serve(async (req) => {
     const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY') || '');
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
+    // Configure the chat with web search capabilities
+    const chat = model.startChat({
+      generationConfig: {
+        temperature: 0.7,
+        topK: 1,
+        topP: 1,
+        maxOutputTokens: 2048,
+      },
+      tools: [{
+        googleSearch: {
+          enable: true,
+        },
+      }],
+    });
+
     console.log('Sending prompt to Gemini:', prompt);
 
-    const result = await model.generateContent(prompt);
+    // Get the response with web search enabled
+    const result = await chat.sendMessage(prompt);
     const response = await result.response;
     const text = response.text();
 

@@ -11,9 +11,6 @@ interface Message {
   isBot: boolean;
 }
 
-const TEST_EMAIL = "test@example.com";
-const TEST_PASSWORD = "test123456";
-
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -22,7 +19,7 @@ const Index = () => {
   useEffect(() => {
     setMessages([
       {
-        content: "Hi! I'm CHICHA, your friendly AI assistant powered by Gemini. How can I help you today?",
+        content: "Hi! I'm CHICHA, your friendly AI assistant powered by Gemini. I can search the web to help answer your questions. How can I help you today?",
         isBot: true,
       },
     ]);
@@ -61,7 +58,7 @@ const Index = () => {
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-primary">CHICHA</h1>
-          <p className="text-sm text-muted-foreground">Your AI Assistant (Powered by Gemini)</p>
+          <p className="text-sm text-muted-foreground">Your AI Assistant with Web Search (Powered by Gemini)</p>
         </div>
         <Button variant="outline" onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" />
