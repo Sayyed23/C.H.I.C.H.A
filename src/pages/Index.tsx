@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { Toaster } from "@/components/ui/toaster";
 import { ChatContainer } from "@/components/ChatContainer";
 import { ChatInput } from "@/components/ChatInput";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { LogOut } from "lucide-react";
+import { useState, useEffect } from "react";
 
 interface Message {
   content: string;
@@ -54,15 +55,15 @@ const Index = () => {
   };
 
   return (
-    <div className="flex h-screen flex-col bg-background p-4 font-sans">
-      <div className="mb-6 flex items-center justify-between">
+    <div className="flex h-screen flex-col bg-background p-4 sm:p-6 font-sans">
+      <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-primary">CHICHA</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-primary">CHICHA</h1>
           <p className="text-sm font-medium tracking-wide text-muted-foreground">
             Your AI Assistant with Web Search (Powered by Gemini)
           </p>
         </div>
-        <Button variant="outline" onClick={handleLogout}>
+        <Button variant="outline" onClick={handleLogout} className="w-full sm:w-auto">
           <LogOut className="mr-2 h-4 w-4" />
           Logout
         </Button>

@@ -15,7 +15,7 @@ export const ChatMessage = ({ content, isBot = false }: ChatMessageProps) => {
     >
       <div
         className={cn(
-          "max-w-[80%] rounded-2xl px-6 py-3 font-medium leading-relaxed tracking-wide",
+          "max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 sm:px-6 py-3 font-medium leading-relaxed tracking-wide",
           isBot 
             ? "bg-secondary text-secondary-foreground" 
             : "bg-primary text-primary-foreground"
