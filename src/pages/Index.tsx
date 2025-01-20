@@ -54,11 +54,13 @@ const Index = () => {
   };
 
   return (
-    <div className="flex h-screen flex-col bg-background p-4">
-      <div className="mb-4 flex items-center justify-between">
+    <div className="flex h-screen flex-col bg-background p-4 font-sans">
+      <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-primary">CHICHA</h1>
-          <p className="text-sm text-muted-foreground">Your AI Assistant with Web Search (Powered by Gemini)</p>
+          <h1 className="text-3xl font-bold tracking-tight text-primary">CHICHA</h1>
+          <p className="text-sm font-medium tracking-wide text-muted-foreground">
+            Your AI Assistant with Web Search (Powered by Gemini)
+          </p>
         </div>
         <Button variant="outline" onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" />
