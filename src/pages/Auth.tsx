@@ -15,40 +15,44 @@ const AuthPage = () => {
 
   const createTestUser = async () => {
     try {
-      const { error } = await supabase.auth.signUp({
-        email: TEST_EMAIL,
-        password: TEST_PASSWORD,
-      });
-
-      if (error) throw error;
-
-      // After creating the user, try to sign in
+      // First try to sign in, in case the user already exists
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: TEST_EMAIL,
         password: TEST_PASSWORD,
       });
 
-      if (signInError) throw signInError;
+      // If sign in fails because user doesn't exist, create new user
+      if (signInError && signInError.message.includes('Invalid login credentials')) {
+        const { error: signUpError } = await supabase.auth.signUp({
+          email: TEST_EMAIL,
+          password: TEST_PASSWORD,
+        });
+
+        if (signUpError) throw signUpError;
+
+        // Try to sign in immediately after creation
+        const { error: finalSignInError } = await supabase.auth.signInWithPassword({
+          email: TEST_EMAIL,
+          password: TEST_PASSWORD,
+        });
+
+        if (finalSignInError) {
+          if (finalSignInError.message.includes('Email not confirmed')) {
+            setError("Please disable email confirmation in Supabase Auth settings for development.");
+            return;
+          }
+          throw finalSignInError;
+        }
+      } else if (signInError) {
+        if (signInError.message.includes('Email not confirmed')) {
+          setError("Please disable email confirmation in Supabase Auth settings for development.");
+          return;
+        }
+        throw signInError;
+      }
 
     } catch (err) {
-      if (err instanceof AuthError) {
-        // If the user already exists, try to sign in directly
-        if (err.message.includes('User already registered')) {
-          try {
-            const { error: signInError } = await supabase.auth.signInWithPassword({
-              email: TEST_EMAIL,
-              password: TEST_PASSWORD,
-            });
-            if (signInError) throw signInError;
-          } catch (signInErr) {
-            setError((signInErr as Error).message);
-          }
-        } else {
-          setError(err.message);
-        }
-      } else {
-        setError((err as Error).message);
-      }
+      setError((err as Error).message);
     }
   };
 
