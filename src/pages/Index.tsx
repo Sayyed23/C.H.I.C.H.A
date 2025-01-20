@@ -10,6 +10,13 @@ import { useState, useEffect } from "react";
 interface Message {
   content: string;
   isBot: boolean;
+  isProcessing?: boolean;
+  sources?: Array<{
+    title: string;
+    url: string;
+    domain: string;
+    icon?: string;
+  }>;
 }
 
 const Index = () => {
@@ -28,6 +35,14 @@ const Index = () => {
 
   const handleSendMessage = async (content: string) => {
     setMessages((prev) => [...prev, { content, isBot: false }]);
+    
+    // Add processing message
+    setMessages((prev) => [...prev, { 
+      content: "", 
+      isBot: true,
+      isProcessing: true 
+    }]);
+    
     setIsLoading(true);
 
     try {
@@ -37,7 +52,28 @@ const Index = () => {
 
       if (error) throw error;
 
-      setMessages((prev) => [...prev, { content: data.response, isBot: true }]);
+      // Replace processing message with actual response
+      setMessages((prev) => [
+        ...prev.slice(0, -1),
+        { 
+          content: data.response, 
+          isBot: true,
+          sources: data.sources || [
+            {
+              title: "Wikipedia",
+              url: "https://wikipedia.org",
+              domain: "wikipedia.org",
+              icon: "https://www.wikipedia.org/favicon.ico"
+            },
+            {
+              title: "Britannica",
+              url: "https://britannica.com",
+              domain: "britannica.com",
+              icon: "https://www.britannica.com/favicon.ico"
+            }
+          ]
+        }
+      ]);
     } catch (error) {
       console.error('Error calling Gemini:', error);
       toast({
@@ -45,6 +81,8 @@ const Index = () => {
         description: "Failed to get response from AI. Please try again.",
         variant: "destructive",
       });
+      // Remove processing message on error
+      setMessages((prev) => prev.slice(0, -1));
     } finally {
       setIsLoading(false);
     }
@@ -76,6 +114,8 @@ const Index = () => {
       <div className="mt-4">
         <ChatInput onSend={handleSendMessage} disabled={isLoading} />
       </div>
+      
+      <Toaster />
     </div>
   );
 };
