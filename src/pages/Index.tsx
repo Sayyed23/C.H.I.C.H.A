@@ -11,6 +11,9 @@ interface Message {
   isBot: boolean;
 }
 
+const TEST_EMAIL = "test@example.com";
+const TEST_PASSWORD = "test123456";
+
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -19,7 +22,7 @@ const Index = () => {
   useEffect(() => {
     setMessages([
       {
-        content: "Hi! I'm CHICHA, your friendly AI assistant. How can I help you today?",
+        content: "Hi! I'm CHICHA, your friendly AI assistant powered by Gemini. How can I help you today?",
         isBot: true,
       },
     ]);
@@ -30,18 +33,21 @@ const Index = () => {
     setIsLoading(true);
 
     try {
-      const response = "I'm currently in development, but I'll be able to help you soon!";
-      
-      setTimeout(() => {
-        setMessages((prev) => [...prev, { content: response, isBot: true }]);
-        setIsLoading(false);
-      }, 1000);
+      const { data, error } = await supabase.functions.invoke('chat-with-gemini', {
+        body: { prompt: content },
+      });
+
+      if (error) throw error;
+
+      setMessages((prev) => [...prev, { content: data.response, isBot: true }]);
     } catch (error) {
+      console.error('Error calling Gemini:', error);
       toast({
         title: "Error",
-        description: "Failed to get response. Please try again.",
+        description: "Failed to get response from AI. Please try again.",
         variant: "destructive",
       });
+    } finally {
       setIsLoading(false);
     }
   };
@@ -55,7 +61,7 @@ const Index = () => {
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-primary">CHICHA</h1>
-          <p className="text-sm text-muted-foreground">Your AI Assistant</p>
+          <p className="text-sm text-muted-foreground">Your AI Assistant (Powered by Gemini)</p>
         </div>
         <Button variant="outline" onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" />
