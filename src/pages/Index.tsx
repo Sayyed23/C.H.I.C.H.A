@@ -4,8 +4,9 @@ import { ChatInput } from "@/components/ChatInput";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { LogOut } from "lucide-react";
+import { LogOut, Mic, MicOff } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 
 interface Message {
   content: string;
@@ -23,6 +24,15 @@ const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const {
+    isListening,
+    transcript,
+    interimTranscript,
+    isError,
+    errorMessage,
+    startListening,
+    stopListening,
+  } = useSpeechRecognition();
 
   useEffect(() => {
     setMessages([
@@ -32,6 +42,12 @@ const Index = () => {
       },
     ]);
   }, []);
+
+  useEffect(() => {
+    if (transcript) {
+      handleSendMessage(transcript);
+    }
+  }, [transcript]);
 
   const handleSendMessage = async (content: string) => {
     setMessages((prev) => [...prev, { content, isBot: false }]);
@@ -111,9 +127,18 @@ const Index = () => {
         <ChatContainer messages={messages} />
       </div>
       
-      <div className="mt-4">
+      <div className="mt-4 flex items-center">
         <ChatInput onSend={handleSendMessage} disabled={isLoading} />
+        <Button variant="outline" onClick={isListening ? stopListening : startListening} className="ml-2">
+          {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+        </Button>
       </div>
+      
+      {interimTranscript && (
+        <div className="mt-2 text-muted-foreground">
+          <p>Listening: {interimTranscript}</p>
+        </div>
+      )}
       
       <Toaster />
     </div>
