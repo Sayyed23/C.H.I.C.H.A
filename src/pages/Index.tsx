@@ -116,10 +116,17 @@ const Index = () => {
   const handleChatHistory = async () => {
     try {
       const { data, error } = await supabase.functions.invoke('get-chat-history');
-
+      
       if (error) throw error;
+      if (!data || !Array.isArray(data)) throw new Error('Invalid response format');
 
-      setMessages(data);
+      // Convert the chat history format to messages format
+      const chatMessages = data.length > 0 ? data[0].messages.map((msg: any) => ({
+        content: msg.content,
+        isBot: msg.is_bot,
+      })) : [];
+
+      setMessages(chatMessages);
     } catch (error) {
       console.error('Error getting chat history:', error);
       toast({
