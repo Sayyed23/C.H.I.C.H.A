@@ -115,7 +115,9 @@ const Index = () => {
 
   const handleChatHistory = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('get-chat-history');
+      const { data, error } = await supabase.functions.invoke('get-chat-history', {
+        method: 'GET'
+      });
       
       if (error) throw error;
       if (!data || !Array.isArray(data)) throw new Error('Invalid response format');

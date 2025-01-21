@@ -14,6 +14,8 @@ Deno.serve(async (req) => {
       throw new Error('No authorization header')
     }
 
+    console.log('Auth header received:', authHeader)
+
     // Create a Supabase client with the auth header
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -29,8 +31,16 @@ Deno.serve(async (req) => {
       error: userError,
     } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''))
 
-    if (userError) throw userError
-    if (!user) throw new Error('No user found')
+    if (userError) {
+      console.error('User error:', userError)
+      throw userError
+    }
+    if (!user) {
+      console.error('No user found')
+      throw new Error('No user found')
+    }
+
+    console.log('User found:', user.id)
 
     // Get chat history for the user
     const { data: chatHistory, error: chatError } = await supabase
@@ -50,7 +60,12 @@ Deno.serve(async (req) => {
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
 
-    if (chatError) throw chatError
+    if (chatError) {
+      console.error('Chat history error:', chatError)
+      throw chatError
+    }
+
+    console.log('Chat history retrieved:', chatHistory)
 
     return new Response(JSON.stringify(chatHistory), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
