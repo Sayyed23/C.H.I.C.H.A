@@ -64,12 +64,15 @@ const Index = () => {
 
   const handleSendMessage = async (content: string) => {
     try {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) throw new Error('Not authenticated');
+
       // If no chat exists, create one
       let chatId = currentChatId;
       if (!chatId) {
         const { data: newChat, error: chatError } = await supabase
           .from('chat_history')
-          .insert([{}])
+          .insert([{ user_id: user.user.id }])
           .select()
           .single();
 

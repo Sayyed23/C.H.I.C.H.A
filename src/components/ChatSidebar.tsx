@@ -23,9 +23,13 @@ export function ChatSidebar() {
   const { data: chats, refetch: refetchChats } = useQuery({
     queryKey: ['chats'],
     queryFn: async () => {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) throw new Error('Not authenticated');
+
       const { data, error } = await supabase
         .from('chat_history')
         .select('*')
+        .eq('user_id', user.user.id)
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
@@ -35,9 +39,12 @@ export function ChatSidebar() {
 
   const createNewChat = async () => {
     try {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) throw new Error('Not authenticated');
+
       const { data, error } = await supabase
         .from('chat_history')
-        .insert([{}])
+        .insert([{ user_id: user.user.id }])
         .select()
         .single();
 
@@ -82,7 +89,7 @@ export function ChatSidebar() {
                   >
                     <a href={`/?chat=${chat.id}`}>
                       <MessageSquare className="h-4 w-4" />
-                      <span>{chat.title}</span>
+                      <span>{chat.title || 'New Chat'}</span>
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
