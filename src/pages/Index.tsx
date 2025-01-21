@@ -52,7 +52,6 @@ const Index = () => {
   const handleSendMessage = async (content: string) => {
     setMessages((prev) => [...prev, { content, isBot: false }]);
     
-    // Add processing message
     setMessages((prev) => [...prev, { 
       content: "", 
       isBot: true,
@@ -68,26 +67,12 @@ const Index = () => {
 
       if (error) throw error;
 
-      // Replace processing message with actual response
       setMessages((prev) => [
         ...prev.slice(0, -1),
         { 
           content: data.response, 
           isBot: true,
-          sources: data.sources || [
-            {
-              title: "Wikipedia",
-              url: "https://wikipedia.org",
-              domain: "wikipedia.org",
-              icon: "https://www.wikipedia.org/favicon.ico"
-            },
-            {
-              title: "Britannica",
-              url: "https://britannica.com",
-              domain: "britannica.com",
-              icon: "https://www.britannica.com/favicon.ico"
-            }
-          ]
+          sources: data.sources || []
         }
       ]);
     } catch (error) {
@@ -97,7 +82,6 @@ const Index = () => {
         description: "Failed to get response from AI. Please try again.",
         variant: "destructive",
       });
-      // Remove processing message on error
       setMessages((prev) => prev.slice(0, -1));
     } finally {
       setIsLoading(false);
