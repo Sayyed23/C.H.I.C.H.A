@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { corsHeaders } from "../_shared/cors.ts"
 
-const GOOGLE_TRANSLATE_API_KEY = Deno.env.get('GOOGLE_TRANSLATE_API_KEY')!;
+const GOOGLE_TRANSLATE_API_KEY = Deno.env.get('GOOGLE_TRANSLATE_API_KEY');
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -9,7 +9,19 @@ serve(async (req) => {
   }
 
   try {
+    // Validate API key exists
+    if (!GOOGLE_TRANSLATE_API_KEY) {
+      throw new Error('Google Translate API key is not configured');
+    }
+
     const { text, targetLanguage } = await req.json()
+
+    // Validate required parameters
+    if (!text || !targetLanguage) {
+      throw new Error('Missing required parameters: text and targetLanguage');
+    }
+
+    console.log('Attempting translation:', { targetLanguage, textLength: text.length });
 
     const url = `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_TRANSLATE_API_KEY}`;
     const response = await fetch(url, {
@@ -26,8 +38,15 @@ serve(async (req) => {
 
     const data = await response.json();
     
+    // Log the response for debugging
+    console.log('Translation API response:', JSON.stringify(data));
+    
     if (data.error) {
-      throw new Error(data.error.message);
+      throw new Error(data.error.message || 'Translation API error');
+    }
+
+    if (!data.data?.translations?.[0]?.translatedText) {
+      throw new Error('Invalid response format from Translation API');
     }
 
     return new Response(
@@ -40,6 +59,7 @@ serve(async (req) => {
       },
     )
   } catch (error) {
+    console.error('Translation error:', error.message);
     return new Response(
       JSON.stringify({ error: error.message }),
       {
