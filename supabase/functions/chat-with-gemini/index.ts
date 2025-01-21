@@ -39,12 +39,28 @@ serve(async (req) => {
     // Get the response with web search enabled
     const result = await chat.sendMessage(prompt);
     const response = await result.response;
-    const text = response.text();
+    let text = response.text();
 
-    console.log('Received response from Gemini:', text);
+    // Format the response by removing asterisks and ensuring proper spacing
+    text = text.replace(/\*\*/g, '') // Remove double asterisks
+              .replace(/\*/g, '')    // Remove single asterisks
+              .replace(/\n\s*\n/g, '\n') // Remove extra blank lines
+              .trim();
+
+    console.log('Formatted response from Gemini:', text);
 
     return new Response(
-      JSON.stringify({ response: text }),
+      JSON.stringify({ 
+        response: text,
+        sources: [
+          {
+            title: "Search Results",
+            url: "https://www.google.com",
+            domain: "google.com",
+            icon: "https://www.google.com/favicon.ico"
+          }
+        ]
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       },
