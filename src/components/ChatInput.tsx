@@ -1,81 +1,84 @@
-import { useState, useRef, ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Upload } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Send, Image } from "lucide-react";
+import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ChatInputProps {
-  onSend: (message: string) => void;
+  onSend: (message: string, imageUrl?: string) => void;
   disabled?: boolean;
-  onImageSelect?: (file: File) => void;
 }
 
-export const ChatInput = ({ onSend, disabled, onImageSelect }: ChatInputProps) => {
+export const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
   const [message, setMessage] = useState("");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [image, setImage] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (message.trim()) {
-      onSend(message.trim());
-      setMessage("");
-      if (textareaRef.current) {
-        textareaRef.current.style.height = "auto";
+    if (message.trim() || image) {
+      setIsSubmitting(true);
+      try {
+        let imageUrl;
+        if (image) {
+          const { data, error } = await supabase.storage.from('images').upload(`public/${image.name}`, image);
+          if (error) {
+            console.error('Error uploading image:', error);
+            return;
+          }
+          imageUrl = data?.path ? supabase.storage.from('images').getPublicUrl(data.path).data.publicUrl : '';
+        }
+        onSend(message, imageUrl);
+        setMessage("");
+        setImage(null);
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e);
-    }
-  };
-
-  const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && onImageSelect) {
-      onImageSelect(file);
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setImage(e.target.files[0]);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="relative">
-      <div className="flex items-end gap-2">
-        <div className="relative flex-1">
-          <Textarea
-            ref={textareaRef}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type a message..."
-            disabled={disabled}
-            className="min-h-[60px] w-full resize-none bg-background px-4 py-3 pr-20"
-            rows={1}
-          />
-          <div className="absolute bottom-2 right-2 flex items-center gap-2">
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleImageUpload}
-              accept="image/*"
-              className="hidden"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Upload className="h-4 w-4" />
-            </Button>
-            <Button type="submit" disabled={disabled || !message.trim()}>
-              Send
-            </Button>
-          </div>
-        </div>
+    <form onSubmit={handleSubmit} className="flex gap-2 w-full items-center">
+      <div className="relative flex-1">
+        <Input
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="Type your message..."
+          disabled={disabled}
+          className="pr-10"
+        />
+        <label 
+          htmlFor="image-upload" 
+          className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer hover:text-primary transition-colors"
+        >
+          <Image className="h-5 w-5" />
+        </label>
       </div>
+      <input
+        type="file"
+        accept="image/*"
+        onChange={handleImageChange}
+        disabled={disabled}
+        className="hidden"
+        id="image-upload"
+      />
+      <Button
+        type="submit"
+        disabled={disabled || isSubmitting || (!message.trim() && !image)}
+        className="flex-shrink-0"
+      >
+        {isSubmitting ? (
+          <div className="animate-spin h-4 w-4 border-2 border-current rounded-full" />
+        ) : (
+          <Send className="h-4 w-4" />
+        )}
+      </Button>
     </form>
   );
 };

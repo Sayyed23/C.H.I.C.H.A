@@ -4,7 +4,7 @@ import { ChatInput } from "@/components/ChatInput";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { LogOut, Mic, MicOff, Upload } from "lucide-react";
+import { LogOut, Mic, MicOff } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 
@@ -20,19 +20,10 @@ interface Message {
   }>;
 }
 
-interface ChatHistory {
-  id: string;
-  title: string;
-  created_at: string;
-}
-
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
-  const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const { toast } = useToast();
   const {
     transcript,
@@ -50,8 +41,6 @@ const Index = () => {
         isBot: true,
       },
     ]);
-    createNewChat();
-    fetchChatHistory();
   }, []);
 
   useEffect(() => {
@@ -60,122 +49,17 @@ const Index = () => {
     }
   }, [transcript]);
 
-  const fetchChatHistory = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('chat_history')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setChatHistory(data);
-    } catch (error) {
-      console.error('Error fetching chat history:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch chat history",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const createNewChat = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from('chat_history')
-        .insert({ user_id: user.id })
-        .select()
-        .single();
-
-      if (error) throw error;
-      setCurrentChatId(data.id);
-      fetchChatHistory(); // Refresh chat history
-    } catch (error) {
-      console.error('Error creating new chat:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create new chat",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleImageUpload = async (file: File) => {
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('images')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('images')
-        .getPublicUrl(filePath);
-
-      return publicUrl;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      throw error;
-    }
-  };
-
   const handleSendMessage = async (content: string) => {
-    if (!currentChatId) return;
-
-    let imageUrl = null;
-    if (selectedImage) {
-      try {
-        imageUrl = await handleImageUpload(selectedImage);
-        setSelectedImage(null);
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to upload image",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-
-    const userMessage = imageUrl 
-      ? `${content}\n![Image](${imageUrl})`
-      : content;
-
-    setMessages((prev) => [...prev, { content: userMessage, isBot: false }]);
+    setMessages((prev) => [...prev, { content, isBot: false }]);
     setMessages((prev) => [...prev, { content: "", isBot: true, isProcessing: true }]);
     setIsLoading(true);
 
     try {
-      // Save user message to database
-      await supabase
-        .from('messages')
-        .insert({
-          chat_id: currentChatId,
-          content: userMessage,
-          is_bot: false,
-        });
-
       const { data, error } = await supabase.functions.invoke('chat-with-gemini', {
-        body: { prompt: content, imageUrl },
+        body: { prompt: content },
       });
 
       if (error) throw error;
-
-      // Save bot response to database
-      await supabase
-        .from('messages')
-        .insert({
-          chat_id: currentChatId,
-          content: data.response,
-          is_bot: true,
-        });
 
       setMessages((prev) => [
         ...prev.slice(0, -1),
@@ -185,7 +69,7 @@ const Index = () => {
       console.error('Error calling Gemini:', error);
       toast({
         title: "Error",
-        description: "Failed to get response from AI",
+        description: "Failed to get response from AI. Please try again.",
         variant: "destructive",
       });
       setMessages((prev) => prev.slice(0, -1));
@@ -212,13 +96,13 @@ const Index = () => {
       console.error('Error signing out:', error);
       toast({
         title: "Error",
-        description: "Failed to sign out",
+        description: "Failed to sign out. Please try again.",
         variant: "destructive",
       });
     }
   };
 
-  const handleNewChat = async () => {
+  const handleNewChat = () => {
     setMessages([
       {
         content: "Hi! I'm CHICHA, your friendly AI assistant powered by Gemini. I can search the web to help answer your questions. How can I help you today?",
@@ -227,31 +111,28 @@ const Index = () => {
     ]);
     setIsListening(false);
     stopListening();
-    await createNewChat();
   };
 
-  const loadChat = async (chatId: string) => {
+  const handleChatHistory = async () => {
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('chat_id', chatId)
-        .order('created_at', { ascending: true });
-
+      const { data, error } = await supabase.functions.invoke('get-chat-history', {
+        method: 'GET'
+      });
+      
       if (error) throw error;
+      if (!data || !Array.isArray(data)) throw new Error('Invalid response format');
 
-      const formattedMessages = data.map(msg => ({
+      const chatMessages = data.length > 0 ? data[0].messages.map((msg: any) => ({
         content: msg.content,
         isBot: msg.is_bot,
-      }));
+      })) : [];
 
-      setMessages(formattedMessages);
-      setCurrentChatId(chatId);
+      setMessages(chatMessages);
     } catch (error) {
-      console.error('Error loading chat:', error);
+      console.error('Error getting chat history:', error);
       toast({
         title: "Error",
-        description: "Failed to load chat history",
+        description: "Failed to get chat history. Please try again.",
         variant: "destructive",
       });
     }
@@ -265,18 +146,9 @@ const Index = () => {
           <Button variant="outline" onClick={handleNewChat} className="w-full">
             New Chat
           </Button>
-          <div className="space-y-2">
-            {chatHistory.map((chat) => (
-              <Button
-                key={chat.id}
-                variant="ghost"
-                onClick={() => loadChat(chat.id)}
-                className="w-full justify-start text-left"
-              >
-                {chat.title}
-              </Button>
-            ))}
-          </div>
+          <Button variant="outline" onClick={handleChatHistory} className="w-full">
+            Chat History
+          </Button>
         </div>
         <Button 
           variant="outline" 
@@ -303,11 +175,7 @@ const Index = () => {
 
         <div className="mt-4 flex items-center gap-2">
           <div className="flex-1">
-            <ChatInput 
-              onSend={handleSendMessage} 
-              disabled={isLoading} 
-              onImageSelect={setSelectedImage}
-            />
+            <ChatInput onSend={handleSendMessage} disabled={isLoading} />
           </div>
           <Button 
             variant="outline" 
@@ -317,21 +185,6 @@ const Index = () => {
             {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
           </Button>
         </div>
-
-        {selectedImage && (
-          <div className="mt-2 flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              Selected image: {selectedImage.name}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSelectedImage(null)}
-            >
-              Remove
-            </Button>
-          </div>
-        )}
 
         {interimTranscript && (
           <div className="mt-2 text-muted-foreground">
