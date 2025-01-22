@@ -4,7 +4,7 @@ import { ChatInput } from "@/components/ChatInput";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { LogOut, Mic, MicOff, Plus, Trash2 } from "lucide-react";
+import { LogOut, Mic, MicOff, Plus, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 
@@ -33,6 +33,8 @@ const Index = () => {
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [isButtonVisible, setIsButtonVisible] = useState(true);
   const { toast } = useToast();
   const {
     transcript,
@@ -302,53 +304,84 @@ const Index = () => {
     await createNewChat();
   };
 
+  const toggleSidebar = () => {
+    setIsSidebarVisible(!isSidebarVisible);
+  };
+
   return (
     <div className="flex h-screen bg-background">
-      <div className="w-[30%] min-w-[250px] h-full border-r border-border bg-card p-4 flex flex-col">
-        <div className="space-y-4">
+      {isSidebarVisible && (
+        <div className="w-[20%] min-w-[250px] h-full border-r border-border bg-card p-4 flex flex-col">
           <Button 
             variant="outline" 
-            onClick={handleNewChat} 
-            className="w-full flex items-center gap-2"
+            onClick={toggleSidebar} 
+            size="sm" 
+            className="mb-4 self-end"
           >
-            <Plus className="h-4 w-4" />
-            New Chat
+            <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div className="space-y-2">
-            {chatHistory.map((chat) => (
-              <div key={chat.id} className="flex items-center gap-2">
-                <Button
-                  variant={currentChatId === chat.id ? "secondary" : "ghost"}
-                  onClick={() => loadChat(chat.id)}
-                  className="flex-1 justify-start text-left truncate"
-                >
-                  {chat.title || "New Chat"}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleDeleteChat(chat.id)}
-                  className="h-8 w-8 flex-shrink-0"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
+          <div className="space-y-4">
+            <Button 
+              variant="outline" 
+              onClick={handleNewChat} 
+              className="w-full flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              New Chat
+            </Button>
+            <div className="space-y-2">
+              {chatHistory.map((chat) => (
+                <div key={chat.id} className="flex items-center gap-2">
+                  <Button
+                    variant={currentChatId === chat.id ? "secondary" : "ghost"}
+                    onClick={() => loadChat(chat.id)}
+                    className="flex-1 justify-start text-left truncate"
+                  >
+                    {chat.title || "New Chat"}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDeleteChat(chat.id)}
+                    className="h-8 w-8 flex-shrink-0"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
           </div>
+          <Button 
+            variant="outline" 
+            onClick={handleLogout} 
+            className="mt-auto mb-4"
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Logout
+          </Button>
         </div>
-        <Button 
-          variant="outline" 
-          onClick={handleLogout} 
-          className="mt-auto mb-4"
+      )}
+      {!isSidebarVisible && isButtonVisible && (
+        <div 
+          className="absolute top-4 left-0 h-10 w-10 flex items-center justify-center hover:w-12 hover:h-12 transition-all duration-300"
+          onMouseEnter={() => setIsSidebarVisible(true)}
+          onMouseLeave={() => setIsButtonVisible(false)}
         >
-          <LogOut className="mr-2 h-4 w-4" />
-          Logout
-        </Button>
-      </div>
+          <Button 
+            variant="outline" 
+            onClick={toggleSidebar} 
+            size="sm"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
 
-      <div className="flex-1 flex flex-col h-full p-4">
-        <div className="mb-4">
-          <h1 className="text-2xl font-bold tracking-tight text-primary">CHICHA</h1>
+      <div className="flex-1 flex flex-col h-full p-4" style={{ width: isSidebarVisible ? '80%' : '100%' }}>
+        <div className="mb-4 text-center">
+          <h1 className="text-2xl font-bold tracking-tight text-primary whitespace-nowrap overflow-hidden text-ellipsis">
+            CHICHA
+          </h1>
           <p className="text-sm text-muted-foreground">
             Your AI Assistant with Web Search (Powered by Gemini)
           </p>

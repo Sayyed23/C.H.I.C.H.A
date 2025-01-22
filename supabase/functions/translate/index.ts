@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { corsHeaders } from "../_shared/cors.ts"
-
-const GOOGLE_TRANSLATE_API_KEY = Deno.env.get('GOOGLE_TRANSLATE_API_KEY');
+import { config } from "https://deno.land/std@0.168.0/dotenv/mod.ts";
+const env = config();
+const GOOGLE_TRANSLATE_API_KEY = env.GOOGLE_TRANSLATE_API_KEY;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
