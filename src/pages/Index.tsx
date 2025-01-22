@@ -24,6 +24,7 @@ const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const { toast } = useToast();
   const {
     transcript,
@@ -41,6 +42,7 @@ const Index = () => {
         isBot: true,
       },
     ]);
+    createNewChat();
   }, []);
 
   useEffect(() => {
@@ -49,17 +51,64 @@ const Index = () => {
     }
   }, [transcript]);
 
-  const handleSendMessage = async (content: string) => {
-    setMessages((prev) => [...prev, { content, isBot: false }]);
+  const createNewChat = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('chat_history')
+        .insert({ user_id: user.id })
+        .select()
+        .single();
+
+      if (error) throw error;
+      setCurrentChatId(data.id);
+    } catch (error) {
+      console.error('Error creating new chat:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create new chat. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSendMessage = async (content: string, imageUrl?: string) => {
+    if (!currentChatId) return;
+
+    const userMessage = imageUrl 
+      ? `${content}\n![Image](${imageUrl})`
+      : content;
+
+    setMessages((prev) => [...prev, { content: userMessage, isBot: false }]);
     setMessages((prev) => [...prev, { content: "", isBot: true, isProcessing: true }]);
     setIsLoading(true);
 
     try {
+      // Save user message to database
+      await supabase
+        .from('messages')
+        .insert({
+          chat_id: currentChatId,
+          content: userMessage,
+          is_bot: false,
+        });
+
       const { data, error } = await supabase.functions.invoke('chat-with-gemini', {
-        body: { prompt: content },
+        body: { prompt: content, imageUrl },
       });
 
       if (error) throw error;
+
+      // Save bot response to database
+      await supabase
+        .from('messages')
+        .insert({
+          chat_id: currentChatId,
+          content: data.response,
+          is_bot: true,
+        });
 
       setMessages((prev) => [
         ...prev.slice(0, -1),
@@ -102,7 +151,7 @@ const Index = () => {
     }
   };
 
-  const handleNewChat = () => {
+  const handleNewChat = async () => {
     setMessages([
       {
         content: "Hi! I'm CHICHA, your friendly AI assistant powered by Gemini. I can search the web to help answer your questions. How can I help you today?",
@@ -111,23 +160,34 @@ const Index = () => {
     ]);
     setIsListening(false);
     stopListening();
+    await createNewChat();
   };
 
   const handleChatHistory = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('get-chat-history', {
-        method: 'GET'
-      });
+      const { data, error } = await supabase
+        .from('chat_history')
+        .select(`
+          id,
+          messages (
+            content,
+            is_bot,
+            created_at
+          )
+        `)
+        .order('created_at', { ascending: true })
+        .single();
       
       if (error) throw error;
-      if (!data || !Array.isArray(data)) throw new Error('Invalid response format');
+      if (!data) throw new Error('No chat history found');
 
-      const chatMessages = data.length > 0 ? data[0].messages.map((msg: any) => ({
+      const chatMessages = data.messages.map((msg: any) => ({
         content: msg.content,
         isBot: msg.is_bot,
-      })) : [];
+      }));
 
       setMessages(chatMessages);
+      setCurrentChatId(data.id);
     } catch (error) {
       console.error('Error getting chat history:', error);
       toast({

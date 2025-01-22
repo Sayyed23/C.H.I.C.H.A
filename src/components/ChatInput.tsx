@@ -21,13 +21,20 @@ export const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
       try {
         let imageUrl;
         if (image) {
-          const { data, error } = await supabase.storage.from('images').upload(`public/${image.name}`, image);
+          const { data, error } = await supabase.storage
+            .from('images')
+            .upload(`public/${image.name}`, image);
+          
           if (error) {
             console.error('Error uploading image:', error);
             return;
           }
-          imageUrl = data?.path ? supabase.storage.from('images').getPublicUrl(data.path).data.publicUrl : '';
+          
+          imageUrl = data?.path 
+            ? supabase.storage.from('images').getPublicUrl(data.path).data.publicUrl 
+            : undefined;
         }
+        
         onSend(message, imageUrl);
         setMessage("");
         setImage(null);
