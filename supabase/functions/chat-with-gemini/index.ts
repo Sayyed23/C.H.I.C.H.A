@@ -14,13 +14,18 @@ serve(async (req) => {
 
   try {
     const apiKey = Deno.env.get('GEMINI_API_KEY');
-    
     if (!apiKey) {
       console.error('GEMINI_API_KEY is not set in environment variables');
-      throw new Error('API key not configured');
+      throw new Error('GEMINI_API_KEY is not configured');
     }
 
-    console.log('Initializing Gemini with API key');
+    // Test API key format
+    if (!apiKey.startsWith('AI')) {
+      console.error('GEMINI_API_KEY appears to be invalid (should start with AI)');
+      throw new Error('Invalid GEMINI_API_KEY format');
+    }
+
+    console.log('Initializing Gemini...');
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
@@ -53,7 +58,7 @@ serve(async (req) => {
               .replace(/\n\s*\n/g, '\n')
               .trim();
 
-    console.log('Received response from Gemini');
+    console.log('Successfully received response from Gemini');
 
     return new Response(
       JSON.stringify({ 
@@ -73,8 +78,13 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error('Error in chat-with-gemini function:', error);
+    
+    // Return a more detailed error response
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: 'If you are seeing an API key error, please ensure you have set a valid Gemini API key in the Supabase Edge Function secrets.'
+      }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
