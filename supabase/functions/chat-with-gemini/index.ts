@@ -13,13 +13,21 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt } = await req.json();
+    const apiKey = Deno.env.get('GEMINI_API_KEY');
     
-    // Initialize Gemini
-    const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY') || '');
+    if (!apiKey) {
+      console.error('GEMINI_API_KEY is not set in environment variables');
+      throw new Error('API key not configured');
+    }
+
+    console.log('Initializing Gemini with API key');
+    const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
-    // Configure the chat with web search capabilities
+    const { prompt } = await req.json();
+    console.log('Received prompt:', prompt);
+
+    // Configure the chat
     const chat = model.startChat({
       generationConfig: {
         temperature: 0.7,
@@ -34,20 +42,18 @@ serve(async (req) => {
       }],
     });
 
-    console.log('Sending prompt to Gemini:', prompt);
-
-    // Get the response with web search enabled
+    console.log('Sending prompt to Gemini');
     const result = await chat.sendMessage(prompt);
     const response = await result.response;
     let text = response.text();
 
-    // Format the response by removing asterisks and ensuring proper spacing
-    text = text.replace(/\*\*/g, '') // Remove double asterisks
-              .replace(/\*/g, '')    // Remove single asterisks
-              .replace(/\n\s*\n/g, '\n') // Remove extra blank lines
+    // Format the response
+    text = text.replace(/\*\*/g, '')
+              .replace(/\*/g, '')
+              .replace(/\n\s*\n/g, '\n')
               .trim();
 
-    console.log('Formatted response from Gemini:', text);
+    console.log('Received response from Gemini');
 
     return new Response(
       JSON.stringify({ 
