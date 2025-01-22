@@ -19,12 +19,6 @@ serve(async (req) => {
       throw new Error('GEMINI_API_KEY is not configured');
     }
 
-    // Test API key format
-    if (!apiKey.startsWith('AI')) {
-      console.error('GEMINI_API_KEY appears to be invalid (should start with AI)');
-      throw new Error('Invalid GEMINI_API_KEY format');
-    }
-
     console.log('Initializing Gemini...');
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
