@@ -44,14 +44,22 @@ export const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex gap-2 w-full">
-      <Input
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        placeholder="Type your message..."
-        disabled={disabled}
-        className="flex-1"
-      />
+    <form onSubmit={handleSubmit} className="flex gap-2 w-full items-center">
+      <div className="relative flex-1">
+        <Input
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="Type your message..."
+          disabled={disabled}
+          className="pr-10"
+        />
+        <label 
+          htmlFor="image-upload" 
+          className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer hover:text-primary transition-colors"
+        >
+          <Image className="h-5 w-5" />
+        </label>
+      </div>
       <input
         type="file"
         accept="image/*"
@@ -60,16 +68,13 @@ export const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
         className="hidden"
         id="image-upload"
       />
-      <label htmlFor="image-upload" className="cursor-pointer">
-        <Image className="h-6 w-6" />
-      </label>
       <Button
         type="submit"
         disabled={disabled || isSubmitting || (!message.trim() && !image)}
-        className="px-4 sm:px-6"
+        className="flex-shrink-0"
       >
         {isSubmitting ? (
-          <div className="animate-spin h-4 w-4 border-2 border-gray-500 rounded-full" />
+          <div className="animate-spin h-4 w-4 border-2 border-current rounded-full" />
         ) : (
           <Send className="h-4 w-4" />
         )}

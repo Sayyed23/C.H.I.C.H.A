@@ -122,7 +122,6 @@ const Index = () => {
       if (error) throw error;
       if (!data || !Array.isArray(data)) throw new Error('Invalid response format');
 
-      // Convert the chat history format to messages format
       const chatMessages = data.length > 0 ? data[0].messages.map((msg: any) => ({
         content: msg.content,
         isBot: msg.is_bot,
@@ -140,50 +139,61 @@ const Index = () => {
   };
 
   return (
-    <div className="flex h-screen flex-col bg-background p-4 sm:p-6 font-sans">
-      <div className="flex flex-row h-full">
-        <div className="w-1/4 p-4 border-r">
-          <Button variant="outline" onClick={handleNewChat} className="w-full mb-4">
+    <div className="flex h-screen bg-background">
+      {/* Sidebar - 30% width */}
+      <div className="w-[30%] min-w-[250px] h-full border-r border-border bg-card p-4 flex flex-col">
+        <div className="space-y-4">
+          <Button variant="outline" onClick={handleNewChat} className="w-full">
             New Chat
           </Button>
           <Button variant="outline" onClick={handleChatHistory} className="w-full">
             Chat History
           </Button>
         </div>
-        <div className="flex-1 flex flex-col">
-          <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-primary">CHICHA</h1>
-              <p className="text-sm font-medium tracking-wide text-muted-foreground">
-                Your AI Assistant with Web Search (Powered by Gemini)
-              </p>
-            </div>
-            <Button variant="outline" onClick={handleLogout} className="w-full sm:w-auto">
-              <LogOut className="mr-2 h-4 w-4" />
-              Logout
-            </Button>
-          </div>
-
-          <div className="flex-1 overflow-hidden rounded-lg border bg-card shadow-sm">
-            <ChatContainer messages={messages} />
-          </div>
-
-          <div className="mt-4 flex items-center">
-            <ChatInput onSend={handleSendMessage} disabled={isLoading} />
-            <Button variant="outline" onClick={isListening ? handleStopListening : handleStartListening} className="ml-2">
-              {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-            </Button>
-          </div>
-
-          {interimTranscript && (
-            <div className="mt-2 text-muted-foreground">
-              <p>Listening: {interimTranscript}</p>
-            </div>
-          )}
-
-          <Toaster />
-        </div>
+        <Button 
+          variant="outline" 
+          onClick={handleLogout} 
+          className="mt-auto mb-4"
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          Logout
+        </Button>
       </div>
+
+      {/* Main Chat Interface - 70% width */}
+      <div className="flex-1 flex flex-col h-full p-4">
+        <div className="mb-4">
+          <h1 className="text-2xl font-bold tracking-tight text-primary">CHICHA</h1>
+          <p className="text-sm text-muted-foreground">
+            Your AI Assistant with Web Search (Powered by Gemini)
+          </p>
+        </div>
+
+        <div className="flex-1 overflow-hidden rounded-lg border bg-card shadow-sm">
+          <ChatContainer messages={messages} />
+        </div>
+
+        <div className="mt-4 flex items-center gap-2">
+          <div className="flex-1">
+            <ChatInput onSend={handleSendMessage} disabled={isLoading} />
+          </div>
+          <Button 
+            variant="outline" 
+            onClick={isListening ? handleStopListening : handleStartListening}
+            className="flex-shrink-0"
+          >
+            {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+          </Button>
+        </div>
+
+        {interimTranscript && (
+          <div className="mt-2 text-muted-foreground">
+            <p>Listening: {interimTranscript}</p>
+          </div>
+        )}
+      </div>
+
+      <Toaster />
     </div>
   );
 };
