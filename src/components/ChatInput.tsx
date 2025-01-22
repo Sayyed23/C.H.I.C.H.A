@@ -1,14 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send, Image } from "lucide-react";
-import { useState } from "react";
+import { Dispatch, SetStateAction, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface ChatInputProps {
-  onSend: (message: string, imageUrl?: string) => void;
-  disabled?: boolean;
+  onSend: (content: string, imageUrl?: string) => Promise<void>;
+  disabled: boolean;
+  onImageSelect: Dispatch<SetStateAction<File | null>>;
 }
-
 export const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
   const [message, setMessage] = useState("");
   const [image, setImage] = useState<File | null>(null);
