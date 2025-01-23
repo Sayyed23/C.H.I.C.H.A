@@ -27,9 +27,15 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
     let imageUrl = "";
     if (imageFile) {
       try {
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from("images")
-          .upload(`chat/${Date.now()}-${imageFile.name}`, imageFile);
+          .upload(`chat/${fileName}`, imageFile, {
+            contentType: imageFile.type,
+            upsert: false
+          });
 
         if (uploadError) throw uploadError;
 
@@ -88,10 +94,32 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Invalid File",
+          description: "Please select an image file.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate file size (5MB limit)
+      const MAX_SIZE = 5 * 1024 * 1024; // 5MB in bytes
+      if (file.size > MAX_SIZE) {
+        toast({
+          title: "File Too Large",
+          description: "Please select an image under 5MB.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       setImageFile(file);
       if (onImageSelect) {
         onImageSelect(file);
       }
+
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
@@ -109,13 +137,15 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
 
   return (
     <div className="flex flex-col gap-2 p-4 border-t bg-background rounded-lg shadow-sm" role="region" aria-label="Message input">
-      <ImagePreview 
-        imagePreview={imagePreview}
-        onClear={() => {
-          setImageFile(null);
-          setImagePreview(null);
-        }}
-      />
+      {imagePreview && (
+        <ImagePreview 
+          imagePreview={imagePreview}
+          onClear={() => {
+            setImageFile(null);
+            setImagePreview(null);
+          }}
+        />
+      )}
       <div className="flex flex-col gap-2">
         <Textarea
           value={message}
