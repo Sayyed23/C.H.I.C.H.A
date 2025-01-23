@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Languages } from "lucide-react";
 import { useToast } from "./ui/use-toast";
+import { Card } from "./ui/card";
 
 interface ChatMessageProps {
   content: string;
@@ -73,6 +74,11 @@ export const ChatMessage = ({
     { text: "Generating response", completed: false },
   ];
 
+  // Extract image URL if present in the content
+  const imageUrlMatch = content.match(/!\[Image\]\((.*?)\)/);
+  const imageUrl = imageUrlMatch ? imageUrlMatch[1] : null;
+  const textContent = content.replace(/!\[Image\]\((.*?)\)/, '').trim();
+
   return (
     <div
       className={cn(
@@ -82,17 +88,33 @@ export const ChatMessage = ({
     >
       {isBot && sources && <SearchResults sources={sources} showViewMore={sources.length > 2} />}
       {isBot && isProcessing && <ProcessingState steps={processingSteps} />}
-      <div className="flex flex-col gap-2">
-        <div
-          className={cn(
-            "max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 sm:px-6 py-3 font-medium leading-relaxed tracking-wide",
-            isBot 
-              ? "bg-secondary text-secondary-foreground" 
-              : "bg-primary text-primary-foreground"
-          )}
-        >
-          {translatedContent || content}
-        </div>
+      <div className="flex flex-col gap-2 max-w-[85%] sm:max-w-[75%]">
+        {imageUrl && (
+          <Card className="overflow-hidden">
+            <img 
+              src={imageUrl} 
+              alt="Uploaded content"
+              className="w-full h-auto object-cover rounded-t-lg"
+            />
+            <div className="p-4">
+              <p className="text-sm text-muted-foreground">
+                {textContent}
+              </p>
+            </div>
+          </Card>
+        )}
+        {!imageUrl && (
+          <div
+            className={cn(
+              "rounded-2xl px-4 sm:px-6 py-3 font-medium leading-relaxed tracking-wide",
+              isBot 
+                ? "bg-secondary text-secondary-foreground" 
+                : "bg-primary text-primary-foreground"
+            )}
+          >
+            {translatedContent || textContent}
+          </div>
+        )}
         {isBot && (
           <div className="flex items-center gap-2">
             <DropdownMenu>

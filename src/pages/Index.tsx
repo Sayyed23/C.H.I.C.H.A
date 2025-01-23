@@ -395,7 +395,7 @@ const Index = () => {
           <div className="flex-1">
             <ChatInput 
               onSend={handleSendMessage} 
-              disabled={isLoading} 
+              isLoading={isLoading} 
               onImageSelect={setSelectedImage}
             />
           </div>
