@@ -1,16 +1,37 @@
-import { useState } from "react";
-import { createClient, AuthError } from "@supabase/supabase-js";
-
-const SUPABASE_URL = "https://your-supabase-url.supabase.co";
-const SUPABASE_ANON_KEY = "a0705a5c54bca94cbfc6660ccd379eb0fb628bddfb4b09175e68cfe64ac5bba6";
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+import { Auth } from "@supabase/auth-ui-react";
+import { ThemeSupa } from "@supabase/auth-ui-shared";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 const TEST_EMAIL = "test@example.com";
 const TEST_PASSWORD = "test123456";
 
 const AuthPage = () => {
   const [error, setError] = useState<string>("");
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        navigate('/');
+      }
+    });
+
+    // Check if user is already signed in
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        navigate('/');
+      }
+    });
+
+    return () => {
+      authListener?.subscription.unsubscribe();
+    };
+  }, [navigate]);
 
   const createTestUser = async () => {
     try {
@@ -40,21 +61,84 @@ const AuthPage = () => {
             setError("Please disable email confirmation in Supabase Auth settings for development.");
             return;
           }
+          throw finalSignInError;
         }
+      } else if (signInError) {
+        if (signInError.message.includes('Email not confirmed')) {
+          setError("Please disable email confirmation in Supabase Auth settings for development.");
+          return;
+        }
+        throw signInError;
       }
-    } catch (error) {
-      if (error instanceof AuthError) {
-        setError(error.message);
-      } else {
-        setError("An unexpected error occurred.");
-      }
+
+    } catch (err) {
+      setError((err as Error).message);
+      console.error('Authentication error:', err);
     }
   };
 
   return (
-    <div>
-      <button onClick={createTestUser}>Create Test User</button>
-      {error && <p>{error}</p>}
+    <div className="container flex h-screen w-full flex-col items-center justify-center">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <CardTitle>Welcome to CHICHA</CardTitle>
+          <CardDescription>Sign in to continue to the application</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <Auth
+            supabaseClient={supabase}
+            appearance={{
+              theme: ThemeSupa,
+              variables: {
+                default: {
+                  colors: {
+                    brand: 'rgb(var(--primary))',
+                    brandAccent: 'rgb(var(--primary))',
+                  },
+                },
+              },
+              style: {
+                button: {
+                  borderRadius: '6px',
+                  height: '40px',
+                },
+                container: {
+                  gap: '16px',
+                },
+              },
+            }}
+            providers={["google"]}
+            redirectTo={window.location.origin}
+            localization={{
+              variables: {
+                sign_in: {
+                  email_label: "Email",
+                  password_label: "Password",
+                  email_input_placeholder: "Your email",
+                  password_input_placeholder: "Your password",
+                  button_label: "Sign in",
+                  loading_button_label: "Signing in ...",
+                },
+              },
+            }}
+            view="sign_in"
+          />
+          <div className="mt-4 text-center">
+            <Button 
+              variant="outline" 
+              onClick={createTestUser}
+              className="w-full"
+            >
+              Create & Login Test Account
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
