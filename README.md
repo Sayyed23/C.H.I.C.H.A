@@ -1,4 +1,4 @@
-# Welcome to your CHCTBOT project
+# Welcome to your CHATBOT project
 
 ## Project info
 
