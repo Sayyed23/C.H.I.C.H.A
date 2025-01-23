@@ -1,10 +1,10 @@
 import { useState, useRef, useCallback } from "react";
-import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
-import { Mic, Send, Image, Search } from "lucide-react";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "./ui/use-toast";
+import { ImagePreview } from "./chat/ImagePreview";
+import { InputActions } from "./chat/InputActions";
 
 interface ChatInputProps {
   onSend: (message: string, imageUrl?: string) => void;
@@ -19,8 +19,7 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const { isListening, startListening, stopListening, transcript } =
-    useSpeechRecognition();
+  const { isListening, startListening, stopListening } = useSpeechRecognition();
 
   const handleSend = useCallback(async () => {
     if (!message.trim() && !imageFile) return;
@@ -32,14 +31,7 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
           .from("images")
           .upload(`chat/${Date.now()}-${imageFile.name}`, imageFile);
 
-        if (uploadError) {
-          toast({
-            title: "Upload Error",
-            description: "Failed to upload image. Please try again.",
-            variant: "destructive",
-          });
-          return;
-        }
+        if (uploadError) throw uploadError;
 
         const { data: { publicUrl } } = supabase.storage
           .from("images")
@@ -116,66 +108,33 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
   };
 
   return (
-    <div className="flex flex-col gap-2 p-4 border-t bg-background">
-      {imagePreview && (
-        <div className="relative w-24 h-24">
-          <img
-            src={imagePreview}
-            alt="Preview"
-            className="w-full h-full object-cover rounded-lg"
-          />
-          <button
-            onClick={() => {
-              setImageFile(null);
-              setImagePreview(null);
-            }}
-            className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full w-6 h-6 flex items-center justify-center"
-          >
-            ×
-          </button>
-        </div>
-      )}
-      <div className="flex gap-2">
+    <div className="flex flex-col gap-2 p-4 border-t bg-background rounded-lg shadow-sm" role="region" aria-label="Message input">
+      <ImagePreview 
+        imagePreview={imagePreview}
+        onClear={() => {
+          setImageFile(null);
+          setImagePreview(null);
+        }}
+      />
+      <div className="flex flex-col gap-2">
         <Textarea
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Type a message..."
-          className="min-h-[20px] max-h-[200px] resize-none"
+          placeholder="Message ChatGPT..."
+          className="min-h-[20px] max-h-[200px] resize-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
           rows={1}
+          aria-label="Message input"
         />
-        <div className="flex flex-col gap-2">
-          <Button
-            size="icon"
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Image className="h-4 w-4" />
-          </Button>
-          <Button
-            size="icon"
-            variant="outline"
-            onClick={handleWebSearch}
-            disabled={isLoading || !message.trim()}
-          >
-            <Search className="h-4 w-4" />
-          </Button>
-          <Button
-            size="icon"
-            variant="outline"
-            onClick={isListening ? stopListening : startListening}
-            className={isListening ? "bg-primary text-primary-foreground" : ""}
-          >
-            <Mic className="h-4 w-4" />
-          </Button>
-          <Button
-            size="icon"
-            onClick={handleSend}
-            disabled={isLoading || (!message.trim() && !imageFile)}
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
+        <InputActions
+          onImageClick={() => fileInputRef.current?.click()}
+          onSearchClick={handleWebSearch}
+          onMicClick={isListening ? stopListening : startListening}
+          onSendClick={handleSend}
+          isListening={isListening}
+          isLoading={!!isLoading}
+          hasContent={!!message.trim() || !!imageFile}
+        />
       </div>
       <input
         type="file"
@@ -183,6 +142,7 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
         onChange={handleImageSelect}
         accept="image/*"
         className="hidden"
+        aria-label="Upload image"
       />
     </div>
   );
