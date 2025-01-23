@@ -1,20 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { corsHeaders } from "../_shared/cors.ts"
-import { config } from "https://deno.land/std@0.168.0/dotenv/mod.ts";
-const env = config();
-const GOOGLE_TRANSLATE_API_KEY = env.GOOGLE_TRANSLATE_API_KEY;
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    // Validate API key exists
-    if (!GOOGLE_TRANSLATE_API_KEY) {
-      throw new Error('Google Translate API key is not configured');
-    }
-
     const { text, targetLanguage } = await req.json()
 
     // Validate required parameters
@@ -24,36 +21,42 @@ serve(async (req) => {
 
     console.log('Attempting translation:', { targetLanguage, textLength: text.length });
 
-    const url = `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_TRANSLATE_API_KEY}`;
-    const response = await fetch(url, {
+    // Create a prompt for Gemini that specifies the translation task
+    const prompt = `Translate the following text to ${targetLanguage}. Only return the translated text, nothing else:\n\n${text}`;
+
+    const response = await fetch('https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'x-goog-api-key': Deno.env.get('GEMINI_API_KEY') || '',
       },
       body: JSON.stringify({
-        q: text,
-        target: targetLanguage,
-        format: 'text'
+        contents: [{
+          parts: [{
+            text: prompt
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.1,
+          topK: 1,
+          topP: 1,
+        },
       }),
     });
 
     const data = await response.json();
     
     // Log the response for debugging
-    console.log('Translation API response:', JSON.stringify(data));
+    console.log('Gemini API response:', JSON.stringify(data));
     
-    if (data.error) {
-      throw new Error(data.error.message || 'Translation API error');
+    if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
+      throw new Error('Invalid response format from Gemini API');
     }
 
-    if (!data.data?.translations?.[0]?.translatedText) {
-      throw new Error('Invalid response format from Translation API');
-    }
+    const translatedText = data.candidates[0].content.parts[0].text.trim();
 
     return new Response(
-      JSON.stringify({ 
-        translatedText: data.data.translations[0].translatedText 
-      }),
+      JSON.stringify({ translatedText }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,

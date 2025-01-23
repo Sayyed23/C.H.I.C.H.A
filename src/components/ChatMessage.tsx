@@ -10,9 +10,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Languages } from "lucide-react";
+import { Languages, X } from "lucide-react";
 import { useToast } from "./ui/use-toast";
 import { Card } from "./ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface ChatMessageProps {
   content: string;
@@ -40,6 +45,7 @@ export const ChatMessage = ({
 }: ChatMessageProps) => {
   const [translatedContent, setTranslatedContent] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
+  const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const handleTranslate = async (languageCode: string) => {
@@ -90,18 +96,37 @@ export const ChatMessage = ({
       {isBot && isProcessing && <ProcessingState steps={processingSteps} />}
       <div className="flex flex-col gap-2 max-w-[85%] sm:max-w-[75%]">
         {imageUrl && (
-          <Card className="overflow-hidden">
-            <img 
-              src={imageUrl} 
-              alt="Uploaded content"
-              className="w-full h-auto object-cover rounded-t-lg"
-            />
-            <div className="p-4">
-              <p className="text-sm text-muted-foreground">
-                {textContent}
-              </p>
-            </div>
-          </Card>
+          <Dialog open={isImageDialogOpen} onOpenChange={setIsImageDialogOpen}>
+            <DialogTrigger asChild>
+              <Card className="overflow-hidden cursor-pointer hover:opacity-95 transition-opacity">
+                <img 
+                  src={imageUrl} 
+                  alt="Uploaded content"
+                  className="w-full h-auto object-cover rounded-t-lg"
+                />
+                <div className="p-4">
+                  <p className="text-sm text-muted-foreground">
+                    {textContent}
+                  </p>
+                </div>
+              </Card>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl w-[95vw] p-0 bg-transparent border-none">
+              <div className="relative rounded-lg overflow-hidden bg-background">
+                <img
+                  src={imageUrl}
+                  alt="Full size preview"
+                  className="w-full h-auto max-h-[90vh] object-contain"
+                />
+                <button
+                  onClick={() => setIsImageDialogOpen(false)}
+                  className="absolute top-2 right-2 p-2 rounded-full bg-background/80 hover:bg-background/90 transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </DialogContent>
+          </Dialog>
         )}
         {!imageUrl && (
           <div
@@ -154,4 +179,4 @@ export const ChatMessage = ({
       </div>
     </div>
   );
-};
+}

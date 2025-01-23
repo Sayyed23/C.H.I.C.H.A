@@ -4,7 +4,7 @@ import { ChatInput } from "@/components/ChatInput";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { LogOut, Mic, MicOff, Plus, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { LogOut, Plus, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 
@@ -29,21 +29,13 @@ interface ChatHistory {
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isListening, setIsListening] = useState(false);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [isButtonVisible, setIsButtonVisible] = useState(true);
   const { toast } = useToast();
-  const {
-    transcript,
-    interimTranscript,
-    isError,
-    errorMessage,
-    startListening,
-    stopListening,
-  } = useSpeechRecognition();
+  const { transcript, isListening, startListening, stopListening } = useSpeechRecognition();
 
   useEffect(() => {
     const initializeChat = async () => {
@@ -52,7 +44,7 @@ const Index = () => {
         await createNewChat();
         setMessages([
           {
-            content: "Hi! I'm CHICHA, your friendly AI assistant powered by Gemini. I can search the web to help answer your questions. How can I help you today?",
+            content: "Hi! I'm CHICHA, your friendly AI assistant. How can I help you today?",
             isBot: true,
           },
         ]);
@@ -66,7 +58,7 @@ const Index = () => {
   }, []);
 
   useEffect(() => {
-    if (transcript) {
+    if (transcript && transcript.trim()) {
       handleSendMessage(transcript);
     }
   }, [transcript]);
@@ -185,7 +177,7 @@ const Index = () => {
 
       if (formattedMessages.length === 0) {
         formattedMessages.push({
-          content: "Hi! I'm CHICHA, your friendly AI assistant.How can I help you today?",
+          content: "Hi! I'm CHICHA, your friendly AI assistant. How can I help you today?",
           isBot: true,
         });
       }
@@ -268,20 +260,20 @@ const Index = () => {
     }
   };
 
-  const handleStartListening = () => {
-    setIsListening(true);
-    startListening();
-  };
-
-  const handleStopListening = () => {
-    setIsListening(false);
-    stopListening();
+  const handleNewChat = async () => {
+    setMessages([
+      {
+        content: "Hi! I'm CHICHA, your friendly AI assistant.How can I help you today?",
+        isBot: true,
+      },
+    ]);
+    await createNewChat();
   };
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
-      window.location.reload();
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
     } catch (error) {
       console.error('Error signing out:', error);
       toast({
@@ -290,18 +282,6 @@ const Index = () => {
         variant: "destructive",
       });
     }
-  };
-
-  const handleNewChat = async () => {
-    setMessages([
-      {
-        content: "Hi! I'm CHICHA, your friendly AI assistant powered by Gemini. I can search the web to help answer your questions. How can I help you today?",
-        isBot: true,
-      },
-    ]);
-    setIsListening(false);
-    stopListening();
-    await createNewChat();
   };
 
   const toggleSidebar = () => {
@@ -379,11 +359,18 @@ const Index = () => {
 
       <div className="flex-1 flex flex-col h-full p-4" style={{ width: isSidebarVisible ? '80%' : '100%' }}>
         <div className="mb-4 text-center">
-          <h1 className="text-2xl font-bold tracking-tight text-primary whitespace-nowrap overflow-hidden text-ellipsis">
-            CHICHA
-          </h1>
+          <div className="flex items-center justify-center gap-2">
+            <img 
+              src="logo.jpeg" 
+              alt="CHICHA Logo" 
+              className="w-10 h-10"
+            />
+            <h1 className="text-2xl font-bold tracking-tight text-primary whitespace-nowrap overflow-hidden text-ellipsis">
+              CHICHA
+            </h1>
+          </div>
           <p className="text-sm text-muted-foreground">
-            Your AI Assistant with Web Search (Powered by Gemini)
+            Your AI Assistant
           </p>
         </div>
 
@@ -391,21 +378,12 @@ const Index = () => {
           <ChatContainer messages={messages} />
         </div>
 
-        <div className="mt-4 flex items-center gap-2">
-          <div className="flex-1">
-            <ChatInput 
-              onSend={handleSendMessage} 
-              isLoading={isLoading} 
-              onImageSelect={setSelectedImage}
-            />
-          </div>
-          <Button 
-            variant="outline" 
-            onClick={isListening ? handleStopListening : handleStartListening}
-            className="flex-shrink-0"
-          >
-            {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-          </Button>
+        <div className="mt-4">
+          <ChatInput 
+            onSend={handleSendMessage} 
+            isLoading={isLoading} 
+            onImageSelect={setSelectedImage}
+          />
         </div>
 
         {selectedImage && (
@@ -420,12 +398,6 @@ const Index = () => {
             >
               Remove
             </Button>
-          </div>
-        )}
-
-        {interimTranscript && (
-          <div className="mt-2 text-muted-foreground">
-            <p>Listening: {interimTranscript}</p>
           </div>
         )}
       </div>

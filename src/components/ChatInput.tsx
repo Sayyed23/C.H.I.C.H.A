@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Textarea } from "./ui/textarea";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,7 +19,30 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const { isListening, startListening, stopListening } = useSpeechRecognition();
+  const { 
+    transcript, 
+    isListening, 
+    startListening, 
+    stopListening,
+    isError,
+    errorMessage 
+  } = useSpeechRecognition();
+
+  useEffect(() => {
+    if (transcript && transcript.trim()) {
+      setMessage(prev => prev + (prev ? ' ' : '') + transcript);
+    }
+  }, [transcript]);
+
+  useEffect(() => {
+    if (isError) {
+      toast({
+        title: "Speech Recognition Error",
+        description: errorMessage || "An error occurred with speech recognition",
+        variant: "destructive",
+      });
+    }
+  }, [isError, errorMessage, toast]);
 
   const handleSend = useCallback(async () => {
     if (!message.trim() && !imageFile) return;
@@ -94,7 +117,6 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validate file type
       if (!file.type.startsWith('image/')) {
         toast({
           title: "Invalid File",
@@ -104,8 +126,7 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
         return;
       }
 
-      // Validate file size (5MB limit)
-      const MAX_SIZE = 5 * 1024 * 1024; // 5MB in bytes
+      const MAX_SIZE = 5 * 1024 * 1024;
       if (file.size > MAX_SIZE) {
         toast({
           title: "File Too Large",
