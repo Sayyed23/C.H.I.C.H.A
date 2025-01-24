@@ -1,18 +1,12 @@
-# Welcome to your Lovable project
+# Welcome to your CHATBOT project
 
 ## Project info
 
-**URL**: https://lovable.dev/projects/29b79db8-21ca-4a7f-9957-263efc3e445a
+**URL**: https://chicha13.netlify.app/
 
 ## How can I edit this code?
 
 There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/29b79db8-21ca-4a7f-9957-263efc3e445a) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
 
 **Use your preferred IDE**
 
@@ -62,7 +56,7 @@ This project is built with .
 
 ## How can I deploy this project?
 
-Simply open [Lovable](https://lovable.dev/projects/29b79db8-21ca-4a7f-9957-263efc3e445a) and click on Share -> Publish.
+u can open Netlify Create Account In it deploy using github repo
 
 ## I want to use a custom domain - is that possible?
 
