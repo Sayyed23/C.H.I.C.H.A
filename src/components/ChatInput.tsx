@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "./ui/use-toast";
 import { ImagePreview } from "./chat/ImagePreview";
 import { InputActions } from "./chat/InputActions";
+import { Wand2 } from "lucide-react";
 
 interface ChatInputProps {
   onSend: (message: string, imageUrl?: string) => void;
@@ -16,6 +17,7 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
   const [message, setMessage] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -43,6 +45,40 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
       });
     }
   }, [isError, errorMessage, toast]);
+
+  const handleGenerateImage = async () => {
+    if (!message.trim()) {
+      toast({
+        title: "Empty Prompt",
+        description: "Please enter a prompt to generate an image.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGeneratingImage(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-image', {
+        body: { prompt: message },
+      });
+
+      if (error) throw error;
+
+      if (data.imageUrl) {
+        onSend(`🎨 Generated image from prompt: "${message}"\n![Image](${data.imageUrl})`);
+        setMessage("");
+      }
+    } catch (error) {
+      console.error('Image generation error:', error);
+      toast({
+        title: "Generation Error",
+        description: "Failed to generate image. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
 
   const handleSend = useCallback(async () => {
     if (!message.trim() && !imageFile) return;
@@ -182,8 +218,10 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
           onSearchClick={handleWebSearch}
           onMicClick={isListening ? stopListening : startListening}
           onSendClick={handleSend}
+          onGenerateImage={handleGenerateImage}
           isListening={isListening}
           isLoading={!!isLoading}
+          isGeneratingImage={isGeneratingImage}
           hasContent={!!message.trim() || !!imageFile}
         />
       </div>

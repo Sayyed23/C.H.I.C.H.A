@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Languages, X } from "lucide-react";
-import { useToast } from "./ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Card } from "./ui/card";
 import {
   Dialog,
@@ -179,4 +179,4 @@ export const ChatMessage = ({
       </div>
     </div>
   );
-}
+};

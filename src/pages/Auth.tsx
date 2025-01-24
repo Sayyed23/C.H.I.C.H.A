@@ -15,8 +15,11 @@ const AuthPage = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+    // Set up auth state listener
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session) {
+        // Store the session in localStorage
+        localStorage.setItem('supabase.auth.token', session.refresh_token || '');
         navigate('/');
       }
     });
@@ -28,6 +31,7 @@ const AuthPage = () => {
       }
     });
 
+    // Cleanup listener on unmount
     return () => {
       authListener?.subscription.unsubscribe();
     };
@@ -35,15 +39,17 @@ const AuthPage = () => {
 
   const createTestUser = async () => {
     try {
+      setError(''); // Clear any previous errors
+      
       // First try to sign in, in case the user already exists
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { error: signInError, data: signInData } = await supabase.auth.signInWithPassword({
         email: TEST_EMAIL,
         password: TEST_PASSWORD,
       });
 
       // If sign in fails because user doesn't exist, create new user
       if (signInError && signInError.message.includes('Invalid login credentials')) {
-        const { error: signUpError } = await supabase.auth.signUp({
+        const { error: signUpError, data: signUpData } = await supabase.auth.signUp({
           email: TEST_EMAIL,
           password: TEST_PASSWORD,
         });
@@ -51,7 +57,7 @@ const AuthPage = () => {
         if (signUpError) throw signUpError;
 
         // Try to sign in immediately after creation
-        const { error: finalSignInError } = await supabase.auth.signInWithPassword({
+        const { error: finalSignInError, data: finalSignInData } = await supabase.auth.signInWithPassword({
           email: TEST_EMAIL,
           password: TEST_PASSWORD,
         });
@@ -63,12 +69,20 @@ const AuthPage = () => {
           }
           throw finalSignInError;
         }
+
+        // Store the session if sign in successful
+        if (finalSignInData.session) {
+          localStorage.setItem('supabase.auth.token', finalSignInData.session.refresh_token || '');
+        }
       } else if (signInError) {
         if (signInError.message.includes('Email not confirmed')) {
           setError("Please disable email confirmation in Supabase Auth settings for development.");
           return;
         }
         throw signInError;
+      } else if (signInData.session) {
+        // Store the session if initial sign in was successful
+        localStorage.setItem('supabase.auth.token', signInData.session.refresh_token || '');
       }
 
     } catch (err) {
