@@ -5,7 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "./ui/use-toast";
 import { ImagePreview } from "./chat/ImagePreview";
 import { InputActions } from "./chat/InputActions";
-import { Wand2 } from "lucide-react";
 
 interface ChatInputProps {
   onSend: (message: string, imageUrl?: string) => void;
@@ -46,33 +45,30 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
     }
   }, [isError, errorMessage, toast]);
 
+  const handleNavigateClick = () => {
+    setMessage("Please enter your starting location and destination in this format: 'From: [location] To: [destination]'");
+  };
+
   const handleGenerateImage = async () => {
-    if (!message.trim()) {
-      toast({
-        title: "Empty Prompt",
-        description: "Please enter a prompt to generate an image.",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!message.trim()) return;
 
     setIsGeneratingImage(true);
     try {
       const { data, error } = await supabase.functions.invoke('generate-image', {
-        body: { prompt: message },
+        body: { prompt: message }
       });
 
       if (error) throw error;
 
-      if (data.imageUrl) {
-        onSend(`🎨 Generated image from prompt: "${message}"\n![Image](${data.imageUrl})`);
+      if (data.image) {
+        onSend(`🎨 Generated image for "${message}": ![Generated Image](${data.image})`);
         setMessage("");
       }
     } catch (error) {
       console.error('Image generation error:', error);
       toast({
         title: "Generation Error",
-        description: "Failed to generate image. Please try again later.",
+        description: "Failed to generate image. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -80,8 +76,22 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
     }
   };
 
+  const handleWeatherClick = () => {
+    setMessage("What's the weather in [location]?");
+  };
+
   const handleSend = useCallback(async () => {
     if (!message.trim() && !imageFile) return;
+
+    // Check if the message is a navigation request
+    const navigationMatch = message.match(/From:\s*([^To]+)\s*To:\s*(.+)/i);
+    if (navigationMatch) {
+      const [, from, to] = navigationMatch;
+      const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(from.trim())}&destination=${encodeURIComponent(to.trim())}`;
+      onSend(`🗺️ Here's your route: [Open in Google Maps](${googleMapsUrl})`);
+      setMessage("");
+      return;
+    }
 
     let imageUrl = "";
     if (imageFile) {
@@ -111,6 +121,79 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
           variant: "destructive",
         });
         return;
+      }
+    }
+
+    // Check if the message is asking about weather
+    const weatherKeywords = ['weather', 'temperature', 'forecast'];
+    const isWeatherQuery = weatherKeywords.some(keyword => 
+      message.toLowerCase().includes(keyword)
+    );
+
+    if (isWeatherQuery) {
+      try {
+        // Extract location from the message
+        const locationMatch = message.match(/(?:weather|temperature|forecast)\s+(?:in|at|for)\s+([^?.,]+)/i);
+        const location = locationMatch ? locationMatch[1].trim() : null;
+
+        if (!location) {
+          onSend("I couldn't determine the location. Please specify a location, for example: 'What's the weather in London?'");
+          return;
+        }
+
+        onSend(`🔍 Checking weather for ${location}...`);
+        
+        const { data, error } = await supabase.functions.invoke('get-weather', {
+          body: { location },
+        });
+
+        if (error) throw error;
+        
+        if (data.message) {
+          onSend(data.message);
+        } else {
+          onSend("Sorry, I couldn't fetch the weather information at this time.");
+        }
+      } catch (error) {
+        console.error('Weather fetch error:', error);
+        toast({
+          title: "Weather Error",
+          description: "Failed to fetch weather information. Please try again.",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
+
+    // Check if the message contains keywords indicating a request for real-time information
+    const realTimeKeywords = ['current', 'latest', 'news', 'today', 'now', 'recent', 'update'];
+    const shouldSearchWeb = realTimeKeywords.some(keyword => 
+      message.toLowerCase().includes(keyword)
+    );
+
+    if (shouldSearchWeb) {
+      try {
+        onSend(`🔍 Searching for real-time information about: ${message}`);
+        
+        const { data, error } = await supabase.functions.invoke('web-search', {
+          body: { query: message },
+        });
+
+        if (error) throw error;
+        
+        if (data && data.results) {
+          const resultsMessage = data.results
+            .map((result: any) => `${result.title}\n${result.url}\n${result.snippet}`)
+            .join('\n\n');
+          onSend(resultsMessage);
+        }
+      } catch (error) {
+        console.error('Web search error:', error);
+        toast({
+          title: "Search Error",
+          description: "Failed to fetch real-time information. Please try again.",
+          variant: "destructive",
+        });
       }
     }
 
@@ -208,7 +291,7 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Message ChatGPT..."
+          placeholder="Message CHICHA... (Use words like 'current', 'latest', or 'today' for real-time information)"
           className="min-h-[20px] max-h-[200px] resize-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
           rows={1}
           aria-label="Message input"
@@ -219,6 +302,8 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
           onMicClick={isListening ? stopListening : startListening}
           onSendClick={handleSend}
           onGenerateImage={handleGenerateImage}
+          onWeatherClick={handleWeatherClick}
+          onNavigateClick={handleNavigateClick}
           isListening={isListening}
           isLoading={!!isLoading}
           isGeneratingImage={isGeneratingImage}

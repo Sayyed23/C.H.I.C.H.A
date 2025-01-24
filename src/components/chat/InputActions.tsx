@@ -1,6 +1,6 @@
 import React from "react";
 import { Button } from "../ui/button";
-import { Paperclip, Globe, Send, Mic, Wand2 } from "lucide-react";
+import { Paperclip, Globe, Send, Mic, Wand2, Thermometer, Navigation2 } from "lucide-react";
 
 interface InputActionsProps {
   onImageClick: () => void;
@@ -8,6 +8,8 @@ interface InputActionsProps {
   onMicClick: () => void;
   onSendClick: () => void;
   onGenerateImage: () => void;
+  onWeatherClick: () => void;
+  onNavigateClick: () => void;
   isListening: boolean;
   isLoading: boolean;
   isGeneratingImage: boolean;
@@ -20,6 +22,8 @@ export const InputActions = ({
   onMicClick,
   onSendClick,
   onGenerateImage,
+  onWeatherClick,
+  onNavigateClick,
   isListening,
   isLoading,
   isGeneratingImage,
@@ -65,6 +69,24 @@ export const InputActions = ({
           aria-label="Generate image"
         >
           <Wand2 className="h-5 w-5 text-muted-foreground" />
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={onWeatherClick}
+          className="h-9 w-9"
+          aria-label="Check weather"
+        >
+          <Thermometer className="h-5 w-5 text-muted-foreground" />
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={onNavigateClick}
+          className="h-9 w-9"
+          aria-label="Get directions"
+        >
+          <Navigation2 className="h-5 w-5 text-muted-foreground" />
         </Button>
       </div>
       <Button

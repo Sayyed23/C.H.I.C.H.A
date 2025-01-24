@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { Check, Languages, X } from "lucide-react";
 import { ProcessingState } from "./ProcessingState";
 import { SearchResults } from "./SearchResults";
 import { Button } from "./ui/button";
@@ -10,7 +11,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Languages, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Card } from "./ui/card";
 import {
@@ -18,6 +18,7 @@ import {
   DialogContent,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { LocationMap } from "./maps/LocationMap";
 
 interface ChatMessageProps {
   content: string;
@@ -48,6 +49,14 @@ export const ChatMessage = ({
   const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
   const { toast } = useToast();
 
+  const processingSteps = [
+    { text: "Analyzing query", completed: true },
+    { text: "Generating search query", completed: true },
+    { text: "Searching knowledge base", completed: true },
+    { text: "Processing information", completed: true },
+    { text: "Generating response", completed: false },
+  ];
+
   const handleTranslate = async (languageCode: string) => {
     setIsTranslating(true);
     try {
@@ -72,18 +81,61 @@ export const ChatMessage = ({
     }
   };
 
-  const processingSteps = [
-    { text: "Analyzing query", completed: true },
-    { text: "Generating search query", completed: true },
-    { text: "Searching knowledge base", completed: true },
-    { text: "Processing information", completed: true },
-    { text: "Generating response", completed: false },
-  ];
+  // Function to safely render content with links
+  const renderContent = (text: string) => {
+    // Match markdown links [text](url)
+    const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+    const parts = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = linkRegex.exec(text)) !== null) {
+      // Add text before the link
+      if (match.index > lastIndex) {
+        parts.push(text.slice(lastIndex, match.index));
+      }
+
+      // Add the link
+      const [fullMatch, linkText, url] = match;
+      parts.push(
+        <a
+          key={match.index}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-500 hover:underline inline-flex items-center gap-1"
+          onClick={(e) => {
+            // Optional: Add confirmation for external links
+            if (!window.confirm('You are about to visit an external website. Continue?')) {
+              e.preventDefault();
+            }
+          }}
+        >
+          {linkText}
+        </a>
+      );
+
+      lastIndex = match.index + fullMatch.length;
+    }
+
+    // Add remaining text
+    if (lastIndex < text.length) {
+      parts.push(text.slice(lastIndex));
+    }
+
+    return parts;
+  };
 
   // Extract image URL if present in the content
   const imageUrlMatch = content.match(/!\[Image\]\((.*?)\)/);
   const imageUrl = imageUrlMatch ? imageUrlMatch[1] : null;
   const textContent = content.replace(/!\[Image\]\((.*?)\)/, '').trim();
+
+  // Extract all locations from weather message
+  const locationMatches = textContent.match(/Weather in ([^:,]+)(?:,|\:|$)/g);
+  const locations = locationMatches 
+    ? locationMatches.map(match => match.replace(/Weather in |\:$/g, '').trim())
+    : [];
 
   return (
     <div
@@ -106,7 +158,7 @@ export const ChatMessage = ({
                 />
                 <div className="p-4">
                   <p className="text-sm text-muted-foreground">
-                    {textContent}
+                    {renderContent(textContent)}
                   </p>
                 </div>
               </Card>
@@ -137,8 +189,14 @@ export const ChatMessage = ({
                 : "bg-primary text-primary-foreground"
             )}
           >
-            {translatedContent || textContent}
+            {renderContent(translatedContent || textContent)}
           </div>
+        )}
+        {locations.length > 0 && isBot && (
+          <LocationMap 
+            locations={locations}
+            className="mt-2 w-full max-w-2xl"
+          />
         )}
         {isBot && (
           <div className="flex items-center gap-2">
