@@ -40,7 +40,6 @@ serve(async (req) => {
 
     console.log('Making request to APILayer Translation API with language:', targetLang);
 
-    // Using query parameters instead of request body as per APILayer documentation
     const url = `https://api.apilayer.com/language_translation/translate?target=${targetLang}&source=en&q=${encodeURIComponent(text)}`;
     
     const response = await fetch(url, {
