@@ -38,19 +38,21 @@ serve(async (req) => {
       throw new Error(`Unsupported target language: ${targetLanguage}`);
     }
 
-    console.log('Making request to APILayer Translation API with language:', targetLang);
-
     // Implement retry logic with exponential backoff
     const maxRetries = 3;
     let lastError = null;
+    let attempt = 0;
 
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
+    while (attempt < maxRetries) {
       try {
         if (attempt > 0) {
-          // Wait before retrying, with exponential backoff
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+          const delay = Math.pow(2, attempt) * 1000;
+          console.log(`Retry attempt ${attempt + 1}, waiting ${delay}ms`);
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
 
+        console.log(`Making translation request (attempt ${attempt + 1}/${maxRetries})`);
+        
         const response = await fetch('https://api.apilayer.com/language_translation/translate', {
           method: 'POST',
           headers: {
@@ -58,60 +60,58 @@ serve(async (req) => {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            text: text,
+            text,
             target: targetLang,
             source: 'en'
           })
         });
 
-        console.log('APILayer Translation API response status:', response.status);
+        console.log('Translation API response status:', response.status);
 
         if (!response.ok) {
           const errorBody = await response.text();
-          console.error('APILayer Translation API error:', errorBody);
+          console.error('Translation API error:', errorBody);
           
+          // For 503 or 429, retry
           if (response.status === 503 || response.status === 429) {
-            // For these specific errors, we want to retry
             throw new Error(`Translation service error (${response.status})`);
-          } else {
-            // For other errors, fail immediately
-            return new Response(
-              JSON.stringify({ 
-                error: `Translation service error (${response.status}). Please try again.` 
-              }),
-              {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: response.status
-              }
-            );
           }
+          
+          return new Response(
+            JSON.stringify({ 
+              error: `Translation service error (${response.status}). Please try again.` 
+            }),
+            {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: response.status
+            }
+          );
         }
 
         const data = await response.json();
-        console.log('APILayer Translation API response:', JSON.stringify(data));
+        console.log('Translation API response:', JSON.stringify(data));
 
-        // Validate response format
-        if (!data.translations || !data.translations[0] || !data.translations[0].translation) {
-          console.error('Invalid response format:', data);
+        if (!data.translations?.[0]?.translation) {
           throw new Error('Invalid response format from translation service');
         }
 
-        // If we get here, the request was successful
         return new Response(
           JSON.stringify({ translatedText: data.translations[0].translation }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200,
-          },
+          }
         );
-      } catch (retryError) {
-        console.error(`Attempt ${attempt + 1} failed:`, retryError);
-        lastError = retryError;
+      } catch (error) {
+        console.error(`Attempt ${attempt + 1} failed:`, error);
+        lastError = error;
         
-        // If this was our last attempt, or if it's not a retryable error, break
-        if (attempt === maxRetries - 1 || !retryError.message.includes('503') && !retryError.message.includes('429')) {
+        // Only retry on specific error codes
+        if (!error.message?.includes('503') && !error.message?.includes('429')) {
           break;
         }
+        
+        attempt++;
       }
     }
 
@@ -129,7 +129,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Translation error:', error.message);
+    console.error('Translation error:', error);
     return new Response(
       JSON.stringify({ 
         error: error.message,
@@ -137,8 +137,8 @@ serve(async (req) => {
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: error.message.includes('temporarily unavailable') ? 503 : 500,
+        status: 500,
       }
-    )
+    );
   }
 })
