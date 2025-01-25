@@ -41,7 +41,7 @@ serve(async (req) => {
     console.log('Making request to APILayer Translation API with language:', targetLang);
 
     const response = await fetch(
-      `https://api.apilayer.com/language_translation/translate?target=${targetLang}&source=en`,
+      'https://api.apilayer.com/language_translation/translate',
       {
         method: 'POST',
         headers: {
@@ -49,22 +49,34 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          text: text
+          text: text,
+          target_language: targetLang,
+          source_language: 'en'
         })
       }
     );
 
+    console.log('APILayer Translation API response status:', response.status);
+
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('APILayer Translation API error:', errorText);
-      throw new Error(`APILayer Translation API returned status ${response.status}`);
+      const errorBody = await response.text();
+      console.error('APILayer Translation API error:', errorBody);
+      
+      if (response.status === 503) {
+        throw new Error('Translation service is temporarily unavailable. Please try again later.');
+      } else if (response.status === 429) {
+        throw new Error('Translation quota exceeded. Please try again later.');
+      } else {
+        throw new Error(`Translation service error (${response.status}). Please try again.`);
+      }
     }
 
     const data = await response.json();
     console.log('APILayer Translation API response:', JSON.stringify(data));
 
     if (!data.translated_text) {
-      throw new Error('Invalid response format from APILayer Translation API');
+      console.error('Invalid response format:', data);
+      throw new Error('Invalid response format from translation service');
     }
 
     return new Response(
@@ -83,7 +95,7 @@ serve(async (req) => {
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
+        status: error.message.includes('temporarily unavailable') ? 503 : 500,
       },
     )
   }
