@@ -40,51 +40,94 @@ serve(async (req) => {
 
     console.log('Making request to APILayer Translation API with language:', targetLang);
 
-    // Using POST method with data in the request body as per APILayer documentation
-    const response = await fetch('https://api.apilayer.com/language_translation/translate', {
-      method: 'POST',
-      headers: {
-        'apikey': apiKey,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        text: text,
-        target: targetLang,
-        source: 'en'
-      })
-    });
+    // Implement retry logic with exponential backoff
+    const maxRetries = 3;
+    let lastError = null;
 
-    console.log('APILayer Translation API response status:', response.status);
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          // Wait before retrying, with exponential backoff
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+        }
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.error('APILayer Translation API error:', errorBody);
-      
-      if (response.status === 503) {
-        throw new Error('Translation service is temporarily unavailable. Please try again later.');
-      } else if (response.status === 429) {
-        throw new Error('Translation quota exceeded. Please try again later.');
-      } else {
-        throw new Error(`Translation service error (${response.status}). Please try again.`);
+        const response = await fetch('https://api.apilayer.com/language_translation/translate', {
+          method: 'POST',
+          headers: {
+            'apikey': apiKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            text: text,
+            target: targetLang,
+            source: 'en'
+          })
+        });
+
+        console.log('APILayer Translation API response status:', response.status);
+
+        if (!response.ok) {
+          const errorBody = await response.text();
+          console.error('APILayer Translation API error:', errorBody);
+          
+          if (response.status === 503 || response.status === 429) {
+            // For these specific errors, we want to retry
+            throw new Error(`Translation service error (${response.status})`);
+          } else {
+            // For other errors, fail immediately
+            return new Response(
+              JSON.stringify({ 
+                error: `Translation service error (${response.status}). Please try again.` 
+              }),
+              {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: response.status
+              }
+            );
+          }
+        }
+
+        const data = await response.json();
+        console.log('APILayer Translation API response:', JSON.stringify(data));
+
+        // Validate response format
+        if (!data.translations || !data.translations[0] || !data.translations[0].translation) {
+          console.error('Invalid response format:', data);
+          throw new Error('Invalid response format from translation service');
+        }
+
+        // If we get here, the request was successful
+        return new Response(
+          JSON.stringify({ translatedText: data.translations[0].translation }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          },
+        );
+      } catch (retryError) {
+        console.error(`Attempt ${attempt + 1} failed:`, retryError);
+        lastError = retryError;
+        
+        // If this was our last attempt, or if it's not a retryable error, break
+        if (attempt === maxRetries - 1 || !retryError.message.includes('503') && !retryError.message.includes('429')) {
+          break;
+        }
       }
     }
 
-    const data = await response.json();
-    console.log('APILayer Translation API response:', JSON.stringify(data));
-
-    // Validate response format
-    if (!data.translations || !data.translations[0] || !data.translations[0].translation) {
-      console.error('Invalid response format:', data);
-      throw new Error('Invalid response format from translation service');
-    }
-
+    // If we get here, all retries failed
+    console.error('All translation attempts failed:', lastError);
     return new Response(
-      JSON.stringify({ translatedText: data.translations[0].translation }),
+      JSON.stringify({ 
+        error: 'Translation service is temporarily unavailable. Please try again later.',
+        details: lastError?.message
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      },
-    )
+        status: 503,
+      }
+    );
+
   } catch (error) {
     console.error('Translation error:', error.message);
     return new Response(
@@ -95,7 +138,7 @@ serve(async (req) => {
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: error.message.includes('temporarily unavailable') ? 503 : 500,
-      },
+      }
     )
   }
 })
