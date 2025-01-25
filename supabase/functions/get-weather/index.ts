@@ -15,13 +15,13 @@ serve(async (req) => {
     const { location } = await req.json()
     console.log('Fetching weather for location:', location)
 
-    const WEATHERSTACK_API_KEY = Deno.env.get('WEATHERSTACK_API_KEY')
-    if (!WEATHERSTACK_API_KEY) {
-      throw new Error('WEATHERSTACK_API_KEY is not configured')
+    const WEATHER_API_KEY = Deno.env.get('APILAYER_API_KEY')
+    if (!WEATHER_API_KEY) {
+      throw new Error('WEATHER_API_KEY is not configured')
     }
 
     const response = await fetch(
-      `http://api.weatherstack.com/current?access_key=${WEATHERSTACK_API_KEY}&query=${encodeURIComponent(location)}`
+      `http://api.weatherapi.com/v1/current.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(location)}&aqi=no`
     )
 
     if (!response.ok) {
@@ -32,18 +32,18 @@ serve(async (req) => {
     console.log('Weather API response:', data)
 
     if (data.error) {
-      throw new Error(data.error.info || 'Failed to fetch weather data')
+      throw new Error(data.error.message || 'Failed to fetch weather data')
     }
 
     // Format the weather data into a readable message
     const weatherInfo = {
       location: `${data.location.name}, ${data.location.country}`,
-      temperature: data.current.temperature,
-      description: data.current.weather_descriptions[0],
+      temperature: data.current.temp_c,
+      description: data.current.condition.text,
       humidity: data.current.humidity,
-      windSpeed: data.current.wind_speed,
-      feelsLike: data.current.feelslike,
-      observationTime: data.current.observation_time,
+      windSpeed: data.current.wind_kph,
+      feelsLike: data.current.feelslike_c,
+      lastUpdated: data.current.last_updated,
       coordinates: {
         lat: data.location.lat,
         lon: data.location.lon,
@@ -55,7 +55,7 @@ Temperature: ${weatherInfo.temperature}°C (Feels like: ${weatherInfo.feelsLike}
 Conditions: ${weatherInfo.description}
 Humidity: ${weatherInfo.humidity}%
 Wind Speed: ${weatherInfo.windSpeed} km/h
-Last Updated: ${weatherInfo.observationTime}`
+Last Updated: ${weatherInfo.lastUpdated}`
 
     return new Response(
       JSON.stringify({ 
