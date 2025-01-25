@@ -21,58 +21,54 @@ serve(async (req) => {
 
     console.log('Starting translation request:', { targetLanguage, textLength: text.length });
 
-    // Map our language codes to Google Translate language codes
+    const apiKey = Deno.env.get('APILAYER_API_KEY');
+    if (!apiKey) {
+      throw new Error('APILayer API key not configured');
+    }
+
+    // Map our language codes to APILayer language codes
     const languageMap: Record<string, string> = {
       'hi': 'hi', // Hindi
       'mr': 'mr', // Marathi
       'sa': 'sa', // Sanskrit
     };
 
-    const googleLanguage = languageMap[targetLanguage];
-    if (!googleLanguage) {
+    const targetLang = languageMap[targetLanguage];
+    if (!targetLang) {
       throw new Error(`Unsupported target language: ${targetLanguage}`);
     }
 
-    console.log('Making request to Google Translate API with language:', googleLanguage);
-
-    const apiKey = Deno.env.get('GOOGLE_TRANSLATE_API_KEY');
-    if (!apiKey) {
-      throw new Error('Google Translate API key not configured');
-    }
+    console.log('Making request to APILayer Translation API with language:', targetLang);
 
     const response = await fetch(
-      `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`,
+      `https://api.apilayer.com/language_translation/translate?target=${targetLang}&source=en`,
       {
         method: 'POST',
         headers: {
+          'apikey': apiKey,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          q: text,
-          target: googleLanguage,
-          source: 'en'
+          text: text
         })
       }
     );
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Google Translate API error:', errorText);
-      throw new Error(`Google Translate API returned status ${response.status}`);
+      console.error('APILayer Translation API error:', errorText);
+      throw new Error(`APILayer Translation API returned status ${response.status}`);
     }
 
     const data = await response.json();
-    console.log('Google Translate API response:', JSON.stringify(data));
+    console.log('APILayer Translation API response:', JSON.stringify(data));
 
-    if (!data.data?.translations?.[0]?.translatedText) {
-      throw new Error('Invalid response format from Google Translate API');
+    if (!data.translated_text) {
+      throw new Error('Invalid response format from APILayer Translation API');
     }
 
-    const translatedText = data.data.translations[0].translatedText;
-    console.log('Successfully translated text:', translatedText);
-
     return new Response(
-      JSON.stringify({ translatedText }),
+      JSON.stringify({ translatedText: data.translated_text }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
