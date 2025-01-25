@@ -40,13 +40,18 @@ serve(async (req) => {
 
     console.log('Making request to APILayer Translation API with language:', targetLang);
 
-    const url = `https://api.apilayer.com/language_translation/translate?target=${targetLang}&source=en&q=${encodeURIComponent(text)}`;
-    
-    const response = await fetch(url, {
-      method: 'GET',
+    // Using POST method with data in the request body as per APILayer documentation
+    const response = await fetch('https://api.apilayer.com/language_translation/translate', {
+      method: 'POST',
       headers: {
         'apikey': apiKey,
+        'Content-Type': 'application/json'
       },
+      body: JSON.stringify({
+        text: text,
+        target: targetLang,
+        source: 'en'
+      })
     });
 
     console.log('APILayer Translation API response status:', response.status);
@@ -67,7 +72,7 @@ serve(async (req) => {
     const data = await response.json();
     console.log('APILayer Translation API response:', JSON.stringify(data));
 
-    // APILayer returns translations in an array with additional metadata
+    // Validate response format
     if (!data.translations || !data.translations[0] || !data.translations[0].translation) {
       console.error('Invalid response format:', data);
       throw new Error('Invalid response format from translation service');
