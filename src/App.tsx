@@ -33,7 +33,7 @@ const App = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event);
       
-      if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+      if (event === 'SIGNED_OUT') {
         // Clear any auth data from localStorage
         localStorage.removeItem('supabase.auth.token');
         setIsAuthenticated(false);
