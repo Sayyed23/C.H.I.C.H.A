@@ -21,50 +21,54 @@ serve(async (req) => {
 
     console.log('Starting translation request:', { targetLanguage, textLength: text.length });
 
-    // Map our language codes to Eden AI language codes
+    // Map our language codes to Google Translate language codes
     const languageMap: Record<string, string> = {
       'hi': 'hi', // Hindi
       'mr': 'mr', // Marathi
       'sa': 'sa', // Sanskrit
     };
 
-    const edenLanguage = languageMap[targetLanguage];
-    if (!edenLanguage) {
+    const googleLanguage = languageMap[targetLanguage];
+    if (!googleLanguage) {
       throw new Error(`Unsupported target language: ${targetLanguage}`);
     }
 
-    console.log('Making request to Eden AI with language:', edenLanguage);
+    console.log('Making request to Google Translate API with language:', googleLanguage);
 
-    const response = await fetch('https://api.edenai.run/v2/translation/automatic_translation', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${Deno.env.get('EDEN_AI_API_KEY')}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        providers: "google",
-        text: text,
-        source_language: "en",
-        target_language: edenLanguage
-      })
-    });
+    const apiKey = Deno.env.get('GOOGLE_TRANSLATE_API_KEY');
+    if (!apiKey) {
+      throw new Error('Google Translate API key not configured');
+    }
+
+    const response = await fetch(
+      `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          q: text,
+          target: googleLanguage,
+          source: 'en'
+        })
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Eden AI API error:', errorText);
-      throw new Error(`Eden AI API returned status ${response.status}`);
+      console.error('Google Translate API error:', errorText);
+      throw new Error(`Google Translate API returned status ${response.status}`);
     }
 
     const data = await response.json();
-    console.log('Eden AI raw response:', JSON.stringify(data));
+    console.log('Google Translate API response:', JSON.stringify(data));
 
-    // Check if we have a valid response with the translated text
-    if (!data.google || data.google.status !== 'success' || !data.google.result) {
-      console.error('Invalid response structure:', data);
-      throw new Error('Invalid response format from Eden AI');
+    if (!data.data?.translations?.[0]?.translatedText) {
+      throw new Error('Invalid response format from Google Translate API');
     }
 
-    const translatedText = data.google.result;
+    const translatedText = data.data.translations[0].translatedText;
     console.log('Successfully translated text:', translatedText);
 
     return new Response(
