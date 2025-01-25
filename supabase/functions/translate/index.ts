@@ -68,14 +68,14 @@ serve(async (req) => {
     const data = await response.json();
     console.log('APILayer Translation API response:', JSON.stringify(data));
 
-    // APILayer returns the translation in a different format
-    if (!data.translation) {
+    // APILayer returns translations in an array with additional metadata
+    if (!data.translations || !data.translations[0] || !data.translations[0].translation) {
       console.error('Invalid response format:', data);
       throw new Error('Invalid response format from translation service');
     }
 
     return new Response(
-      JSON.stringify({ translatedText: data.translation }),
+      JSON.stringify({ translatedText: data.translations[0].translation }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
