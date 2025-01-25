@@ -86,6 +86,41 @@ export type Database = {
         }
         Relationships: []
       }
+      video_transcriptions: {
+        Row: {
+          chat_id: string | null
+          created_at: string
+          id: string
+          summary: string | null
+          transcription: string | null
+          video_url: string
+        }
+        Insert: {
+          chat_id?: string | null
+          created_at?: string
+          id?: string
+          summary?: string | null
+          transcription?: string | null
+          video_url: string
+        }
+        Update: {
+          chat_id?: string | null
+          created_at?: string
+          id?: string
+          summary?: string | null
+          transcription?: string | null
+          video_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_transcriptions_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
+            referencedRelation: "chat_history"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
