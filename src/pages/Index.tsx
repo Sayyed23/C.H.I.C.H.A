@@ -44,7 +44,7 @@ const Index = () => {
         await createNewChat();
         setMessages([
           {
-            content: "Hi! I'm CHICHA, your friendly AI assistant powered by Gemini. I can search the web to help answer your questions. How can I help you today?",
+            content: "Hi! I'm CHICHA, your friendly AI assistant. How can I help you today?",
             isBot: true,
           },
         ]);
@@ -177,7 +177,7 @@ const Index = () => {
 
       if (formattedMessages.length === 0) {
         formattedMessages.push({
-          content: "Hi! I'm CHICHA, your friendly AI assistant powered by Gemini. I can search the web to help answer your questions. How can I help you today?",
+          content: "Hi! I'm CHICHA, your friendly AI assistant . How can I help you today?",
           isBot: true,
         });
       }
@@ -263,7 +263,7 @@ const Index = () => {
   const handleNewChat = async () => {
     setMessages([
       {
-        content: "Hi! I'm CHICHA, your friendly AI assistant powered by Gemini. I can search the web to help answer your questions. How can I help you today?",
+        content: "Hi! I'm CHICHA, your friendly AI assistant. How can I help you today?",
         isBot: true,
       },
     ]);
@@ -359,18 +359,18 @@ const Index = () => {
 
       <div className="flex-1 flex flex-col h-full p-4" style={{ width: isSidebarVisible ? '80%' : '100%' }}>
         <div className="mb-4 text-center">
-          <div className="flex items-center justify-center gap-2">
+          <div className="flex items-center justify-center gap-1">
             <img 
-              src="/lovable-uploads/97c0654d-b95a-4ba5-b4de-e9261711ede4.png" 
+              src="/Logo/logo.png" 
               alt="CHICHA Logo" 
-              className="w-10 h-10"
+              className="w-12 h-12 object-contain"
             />
             <h1 className="text-2xl font-bold tracking-tight text-primary whitespace-nowrap overflow-hidden text-ellipsis">
               CHICHA
             </h1>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Your AI Assistant with Web Search (Powered by Gemini)
+          <p className="text-sm text-muted-foreground mt-0">
+            Your AI Assistant 
           </p>
         </div>
 

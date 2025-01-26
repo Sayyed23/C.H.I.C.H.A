@@ -60,9 +60,15 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
 
       if (error) throw error;
 
-      if (data.image) {
-        onSend(`🎨 Generated image for "${message}": ![Generated Image](${data.image})`);
+      if (data.imageUrl) {
+        onSend(`🎨 Generated image for "${message}": ![Generated Image](${data.imageUrl})`);
         setMessage("");
+      } else {
+        toast({
+          title: "Generation Error",
+          description: "No image was generated. Please try again.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error('Image generation error:', error);
@@ -151,6 +157,7 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
         
         if (data.message) {
           onSend(data.message);
+          setMessage(""); // Clear the input after sending weather request
         } else {
           onSend("Sorry, I couldn't fetch the weather information at this time.");
         }

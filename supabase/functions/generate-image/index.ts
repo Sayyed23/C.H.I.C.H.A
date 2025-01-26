@@ -1,9 +1,4 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const STABILITY_API_KEY = Deno.env.get('STABILITY_API_KEY');
-const STABILITY_API_HOST = 'https://api.stability.ai';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,66 +14,58 @@ serve(async (req) => {
     const { prompt } = await req.json();
     console.log('Generating image for prompt:', prompt);
 
-    const response = await fetch(
-      `${STABILITY_API_HOST}/v1/generation/stable-diffusion-v1-6/text-to-image`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          Authorization: `Bearer ${STABILITY_API_KEY}`,
+    const runwareApiKey = Deno.env.get('RUNWARE_API_KEY');
+    if (!runwareApiKey) {
+      console.error('RUNWARE_API_KEY is not set in environment variables');
+      throw new Error('RUNWARE_API_KEY is not set');
+    }
+
+    console.log('Making request to Runware API...');
+    const response = await fetch('https://api.runware.ai/v1', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify([
+        {
+          taskType: "authentication",
+          apiKey: runwareApiKey
         },
-        body: JSON.stringify({
-          text_prompts: [{ text: prompt }],
-          cfg_scale: 7,
-          height: 512,
-          width: 512,
-          samples: 1,
-          steps: 30,
-        }),
-      }
-    );
+        {
+          taskType: "imageInference",
+          taskUUID: crypto.randomUUID(),
+          positivePrompt: prompt,
+          width: 1024,
+          height: 1024,
+          model: "runware:100@1",
+          numberResults: 1,
+          outputFormat: "WEBP",
+          CFGScale: 1,
+          scheduler: "FlowMatchEulerDiscreteScheduler",
+          strength: 0.8
+        }
+      ])
+    });
 
     if (!response.ok) {
       const error = await response.json();
-      console.error('Stability AI API error:', error);
-      throw new Error(`Stability AI API error: ${JSON.stringify(error)}`);
+      console.error('Runware API error response:', error);
+      throw new Error(`Runware API error: ${JSON.stringify(error)}`);
     }
 
     const data = await response.json();
-    console.log('Stability AI response received');
+    console.log('Runware API response:', data);
 
-    // The API returns base64 encoded images
-    const imageBase64 = data.artifacts[0].base64;
+    // Find the image inference response in the data array
+    const imageData = data.data?.find(item => item.taskType === "imageInference");
     
-    // Convert base64 to blob and upload to Supabase Storage
-    const imageBlob = await fetch(`data:image/png;base64,${imageBase64}`).then(res => res.blob());
-    
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.png`;
-    
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
-    );
-
-    const { data: uploadData, error: uploadError } = await supabaseClient
-      .storage
-      .from('images')
-      .upload(`generated/${fileName}`, imageBlob, {
-        contentType: 'image/png',
-        upsert: false
-      });
-
-    if (uploadError) throw uploadError;
-
-    const { data: { publicUrl } } = supabaseClient
-      .storage
-      .from('images')
-      .getPublicUrl(`generated/${fileName}`);
+    if (!imageData || !imageData.imageURL) {
+      console.error('No image URL in response data:', data);
+      throw new Error('No image URL in image inference response');
+    }
 
     return new Response(
-      JSON.stringify({ imageUrl: publicUrl }),
+      JSON.stringify({ imageUrl: imageData.imageURL }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

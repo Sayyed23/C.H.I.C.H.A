@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Check, Languages, X } from "lucide-react";
+import { Check, Download, Languages, X } from "lucide-react";
 import { ProcessingState } from "./ProcessingState";
 import { SearchResults } from "./SearchResults";
 import { Button } from "./ui/button";
@@ -81,6 +81,33 @@ export const ChatMessage = ({
     }
   };
 
+  const handleDownloadImage = async (imageUrl: string) => {
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `generated-image-${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Success",
+        description: "Image downloaded successfully",
+      });
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        title: "Download Error",
+        description: "Failed to download the image. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Function to safely render content with links
   const renderContent = (text: string) => {
     // Match markdown links [text](url)
@@ -127,9 +154,9 @@ export const ChatMessage = ({
   };
 
   // Extract image URL if present in the content
-  const imageUrlMatch = content.match(/!\[Image\]\((.*?)\)/);
+  const imageUrlMatch = content.match(/!\[.*?\]\((.*?)\)/);
   const imageUrl = imageUrlMatch ? imageUrlMatch[1] : null;
-  const textContent = content.replace(/!\[Image\]\((.*?)\)/, '').trim();
+  const textContent = content.replace(/!\[.*?\]\((.*?)\)/, '').trim();
 
   // Extract all locations from weather message
   const locationMatches = textContent.match(/Weather in ([^:,]+)(?:,|\:|$)/g);
@@ -151,11 +178,24 @@ export const ChatMessage = ({
           <Dialog open={isImageDialogOpen} onOpenChange={setIsImageDialogOpen}>
             <DialogTrigger asChild>
               <Card className="overflow-hidden cursor-pointer hover:opacity-95 transition-opacity">
-                <img 
-                  src={imageUrl} 
-                  alt="Uploaded content"
-                  className="w-full h-auto object-cover rounded-t-lg"
-                />
+                <div className="relative">
+                  <img 
+                    src={imageUrl} 
+                    alt="Generated content"
+                    className="w-full h-auto object-cover rounded-t-lg"
+                  />
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="absolute top-2 right-2 bg-background/80 hover:bg-background/90"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDownloadImage(imageUrl);
+                    }}
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </div>
                 <div className="p-4">
                   <p className="text-sm text-muted-foreground">
                     {renderContent(textContent)}
@@ -170,12 +210,24 @@ export const ChatMessage = ({
                   alt="Full size preview"
                   className="w-full h-auto max-h-[90vh] object-contain"
                 />
-                <button
-                  onClick={() => setIsImageDialogOpen(false)}
-                  className="absolute top-2 right-2 p-2 rounded-full bg-background/80 hover:bg-background/90 transition-colors"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                <div className="absolute top-2 right-2 flex gap-2">
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="bg-background/80 hover:bg-background/90"
+                    onClick={() => handleDownloadImage(imageUrl)}
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="bg-background/80 hover:bg-background/90"
+                    onClick={() => setIsImageDialogOpen(false)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </DialogContent>
           </Dialog>
