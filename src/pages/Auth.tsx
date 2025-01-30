@@ -6,9 +6,25 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
 
 const TEST_EMAIL = "test@example.com";
 const TEST_PASSWORD = "test123456";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDT5h1SqMl_U0E0S4pcd1Cawk0sAAuNMms",
+  authDomain: "chicha-380b1.firebaseapp.com",
+  projectId: "chicha-380b1",
+  storageBucket: "chicha-380b1.firebasestorage.app",
+  messagingSenderId: "225702147709",
+  appId: "1:225702147709:web:f34e9825a341db148e6314",
+  measurementId: "G-DNC4P1RD5G"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
 
 const AuthPage = () => {
   const [error, setError] = useState<string>("");

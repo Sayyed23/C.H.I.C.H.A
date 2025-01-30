@@ -2,11 +2,14 @@ import { Toaster } from "@/components/ui/toaster";
 import { ChatContainer } from "@/components/ChatContainer";
 import { ChatInput } from "@/components/ChatInput";
 import { useToast } from "@/components/ui/use-toast";
-import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { LogOut, Plus, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Button } from "@/components/ui/button";
+import { AppSidebar } from "../components/AppSidebar";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
 interface Message {
   content: string;
@@ -32,10 +35,9 @@ const Index = () => {
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
-  const [isButtonVisible, setIsButtonVisible] = useState(true);
   const { toast } = useToast();
   const { transcript, isListening, startListening, stopListening } = useSpeechRecognition();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const initializeChat = async () => {
@@ -44,7 +46,7 @@ const Index = () => {
         await createNewChat();
         setMessages([
           {
-            content: "Hi! I'm CHICHA, your friendly AI assistant. How can I help you today?",
+            content: "Hi! I'm CHICHA, your friendly AI assistant . How can I help you today?",
             isBot: true,
           },
         ]);
@@ -177,7 +179,7 @@ const Index = () => {
 
       if (formattedMessages.length === 0) {
         formattedMessages.push({
-          content: "Hi! I'm CHICHA, your friendly AI assistant . How can I help you today?",
+          content: "Hi! I'm CHICHA, your friendly AI assistant. How can I help you today?",
           isBot: true,
         });
       }
@@ -285,125 +287,88 @@ const Index = () => {
   };
 
   const toggleSidebar = () => {
-    setIsSidebarVisible(!isSidebarVisible);
+    if (isMobile) {
+      document.body.style.overflow = 'auto';
+    }
   };
 
   return (
-    <div className="flex h-screen bg-background">
-      {isSidebarVisible && (
-        <div className="w-[20%] min-w-[250px] h-full border-r border-border bg-card p-4 flex flex-col">
-          <Button 
-            variant="outline" 
-            onClick={toggleSidebar} 
-            size="sm" 
-            className="mb-4 self-end"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div className="space-y-4">
-            <Button 
-              variant="outline" 
-              onClick={handleNewChat} 
-              className="w-full flex items-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              New Chat
-            </Button>
-            <div className="space-y-2">
-              {chatHistory.map((chat) => (
-                <div key={chat.id} className="flex items-center gap-2">
-                  <Button
-                    variant={currentChatId === chat.id ? "secondary" : "ghost"}
-                    onClick={() => loadChat(chat.id)}
-                    className="flex-1 justify-start text-left truncate"
-                  >
-                    {chat.title || "New Chat"}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDeleteChat(chat.id)}
-                    className="h-8 w-8 flex-shrink-0"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
+    <SidebarProvider>
+      <div className="flex h-screen w-full bg-background overflow-hidden">
+        <AppSidebar 
+          chatHistory={chatHistory}
+          currentChatId={currentChatId}
+          onChatSelect={loadChat}
+          onNewChat={handleNewChat}
+          onDeleteChat={handleDeleteChat}
+        />
+
+        <div className="flex-1 flex flex-col min-h-0">
+          {/* Mobile Header */}
+          <div className="sticky top-0 z-40 bg-background border-b border-border p-4 flex items-center justify-between sm:hidden">
+            <SidebarTrigger />
+            <div className="flex items-center gap-2">
+              <img 
+                src="/lovable-uploads/97c0654d-b95a-4ba5-b4de-e9261711ede4.png" 
+                alt="CHICHA Logo" 
+                className="w-8 h-8"
+              />
+              <h1 className="text-xl font-bold text-primary">CHICHA</h1>
+            </div>
+            <div className="w-10" /> {/* Spacer for alignment */}
+          </div>
+
+          {/* Desktop Header */}
+          <div className="hidden sm:block p-4 border-b border-border">
+            <div className="flex items-center justify-between">
+              <SidebarTrigger />
+              <div className="flex items-center gap-2">
+                <img 
+                  src="/lovable-uploads/97c0654d-b95a-4ba5-b4de-e9261711ede4.png" 
+                  alt="CHICHA Logo" 
+                  className="w-10 h-10"
+                />
+                <h1 className="text-2xl font-bold tracking-tight text-primary">
+                  CHICHA
+                </h1>
+              </div>
+              <div className="w-10" /> {/* Spacer for alignment */}
             </div>
           </div>
-          <Button 
-            variant="outline" 
-            onClick={handleLogout} 
-            className="mt-auto mb-4"
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </Button>
-        </div>
-      )}
-      {!isSidebarVisible && isButtonVisible && (
-        <div 
-          className="absolute top-4 left-0 h-10 w-10 flex items-center justify-center hover:w-12 hover:h-12 transition-all duration-300"
-          onMouseEnter={() => setIsSidebarVisible(true)}
-          onMouseLeave={() => setIsButtonVisible(false)}
-        >
-          <Button 
-            variant="outline" 
-            onClick={toggleSidebar} 
-            size="sm"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
 
-      <div className="flex-1 flex flex-col h-full p-4" style={{ width: isSidebarVisible ? '80%' : '100%' }}>
-        <div className="mb-4 text-center">
-          <div className="flex items-center justify-center gap-1">
-            <img 
-              src="/Logo/logo.png" 
-              alt="CHICHA Logo" 
-              className="w-12 h-12 object-contain"
-            />
-            <h1 className="text-2xl font-bold tracking-tight text-primary whitespace-nowrap overflow-hidden text-ellipsis">
-              CHICHA
-            </h1>
+          {/* Chat Container */}
+          <div className="flex-1 overflow-hidden">
+            <div className="h-full flex flex-col">
+              <div className="flex-1 overflow-hidden">
+                <ChatContainer messages={messages} />
+              </div>
+              <div className="p-4 border-t border-border">
+                <ChatInput 
+                  onSend={handleSendMessage} 
+                  isLoading={isLoading} 
+                  onImageSelect={setSelectedImage}
+                />
+                {selectedImage && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      Selected image: {selectedImage.name}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedImage(null)}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-          <p className="text-sm text-muted-foreground mt-0">
-            Your AI Assistant 
-          </p>
         </div>
-
-        <div className="flex-1 overflow-hidden rounded-lg border bg-card shadow-sm">
-          <ChatContainer messages={messages} />
-        </div>
-
-        <div className="mt-4">
-          <ChatInput 
-            onSend={handleSendMessage} 
-            isLoading={isLoading} 
-            onImageSelect={setSelectedImage}
-          />
-        </div>
-
-        {selectedImage && (
-          <div className="mt-2 flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              Selected image: {selectedImage.name}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSelectedImage(null)}
-            >
-              Remove
-            </Button>
-          </div>
-        )}
       </div>
-
       <Toaster />
-    </div>
+    </SidebarProvider>
   );
 };
 
