@@ -1,3 +1,4 @@
+
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Textarea } from "./ui/textarea";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
@@ -7,18 +8,19 @@ import { ImagePreview } from "./chat/ImagePreview";
 import { InputActions } from "./chat/InputActions";
 
 interface ChatInputProps {
-  onSend: (message: string, imageUrl?: string) => void;
+  onSend: (message: string, imageUrls?: string[]) => void;
   isLoading?: boolean;
-  onImageSelect?: (file: File) => void;
 }
 
-export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) => {
+export const ChatInput = ({ onSend, isLoading }: ChatInputProps) => {
   const [message, setMessage] = useState("");
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [isEditingImage, setIsEditingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const MAX_IMAGES = 5;
 
   const { 
     transcript, 
@@ -82,134 +84,6 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
     }
   };
 
-  const handleWeatherClick = () => {
-    setMessage("What's the weather in [location]?");
-  };
-
-  const handleSend = useCallback(async () => {
-    if (!message.trim() && !imageFile) return;
-
-    // Check if the message is a navigation request
-    const navigationMatch = message.match(/From:\s*([^To]+)\s*To:\s*(.+)/i);
-    if (navigationMatch) {
-      const [, from, to] = navigationMatch;
-      const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(from.trim())}&destination=${encodeURIComponent(to.trim())}`;
-      onSend(`🗺️ Here's your route: [Open in Google Maps](${googleMapsUrl})`);
-      setMessage("");
-      return;
-    }
-
-    let imageUrl = "";
-    if (imageFile) {
-      try {
-        const fileExt = imageFile.name.split('.').pop();
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from("images")
-          .upload(`chat/${fileName}`, imageFile, {
-            contentType: imageFile.type,
-            upsert: false
-          });
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from("images")
-          .getPublicUrl(uploadData.path);
-        
-        imageUrl = publicUrl;
-      } catch (error) {
-        console.error('Image upload error:', error);
-        toast({
-          title: "Upload Error",
-          description: "Failed to upload image. Please try again.",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-
-    // Check if the message is asking about weather
-    const weatherKeywords = ['weather', 'temperature', 'forecast'];
-    const isWeatherQuery = weatherKeywords.some(keyword => 
-      message.toLowerCase().includes(keyword)
-    );
-
-    if (isWeatherQuery) {
-      try {
-        // Extract location from the message
-        const locationMatch = message.match(/(?:weather|temperature|forecast)\s+(?:in|at|for)\s+([^?.,]+)/i);
-        const location = locationMatch ? locationMatch[1].trim() : null;
-
-        if (!location) {
-          onSend("I couldn't determine the location. Please specify a location, for example: 'What's the weather in London?'");
-          return;
-        }
-
-        onSend(`🔍 Checking weather for ${location}...`);
-        
-        const { data, error } = await supabase.functions.invoke('get-weather', {
-          body: { location },
-        });
-
-        if (error) throw error;
-        
-        if (data.message) {
-          onSend(data.message);
-          setMessage(""); // Clear the input after sending weather request
-        } else {
-          onSend("Sorry, I couldn't fetch the weather information at this time.");
-        }
-      } catch (error) {
-        console.error('Weather fetch error:', error);
-        toast({
-          title: "Weather Error",
-          description: "Failed to fetch weather information. Please try again.",
-          variant: "destructive",
-        });
-      }
-      return;
-    }
-
-    // Check if the message contains keywords indicating a request for real-time information
-    const realTimeKeywords = ['current', 'latest', 'news', 'today', 'now', 'recent', 'update'];
-    const shouldSearchWeb = realTimeKeywords.some(keyword => 
-      message.toLowerCase().includes(keyword)
-    );
-
-    if (shouldSearchWeb) {
-      try {
-        onSend(`🔍 Searching for real-time information about: ${message}`);
-        
-        const { data, error } = await supabase.functions.invoke('web-search', {
-          body: { query: message },
-        });
-
-        if (error) throw error;
-        
-        if (data && data.results) {
-          const resultsMessage = data.results
-            .map((result: any) => `${result.title}\n${result.url}\n${result.snippet}`)
-            .join('\n\n');
-          onSend(resultsMessage);
-        }
-      } catch (error) {
-        console.error('Web search error:', error);
-        toast({
-          title: "Search Error",
-          description: "Failed to fetch real-time information. Please try again.",
-          variant: "destructive",
-        });
-      }
-    }
-
-    onSend(message, imageUrl);
-    setMessage("");
-    setImageFile(null);
-    setImagePreview(null);
-  }, [message, imageFile, onSend, toast]);
-
   const handleWebSearch = async () => {
     if (!message.trim()) return;
     
@@ -240,40 +114,158 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
     }
   };
 
+  const handleWeatherClick = () => {
+    setMessage("What's the weather in [location]?");
+  };
+
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+    const files = Array.from(e.target.files || []);
+    
+    if (files.length === 0) return;
+
+    if (imageFiles.length + files.length > MAX_IMAGES) {
+      toast({
+        title: "Too Many Images",
+        description: `You can only upload up to ${MAX_IMAGES} images at once. Please remove some images.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const validFiles = files.filter(file => {
       if (!file.type.startsWith('image/')) {
         toast({
           title: "Invalid File",
-          description: "Please select an image file.",
+          description: `${file.name} is not an image file.`,
           variant: "destructive",
         });
-        return;
+        return false;
       }
 
-      const MAX_SIZE = 5 * 1024 * 1024;
+      const MAX_SIZE = 5 * 1024 * 1024; // 5MB
       if (file.size > MAX_SIZE) {
         toast({
           title: "File Too Large",
-          description: "Please select an image under 5MB.",
+          description: `${file.name} is larger than 5MB.`,
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      return true;
+    });
+
+    if (validFiles.length === 0) return;
+
+    setImageFiles(prev => [...prev, ...validFiles]);
+
+    // Generate previews for valid files
+    validFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreviews(prev => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSend = useCallback(async () => {
+    if (!message.trim() && imageFiles.length === 0) return;
+
+    let imageUrls: string[] = [];
+    if (imageFiles.length > 0) {
+      try {
+        for (const file of imageFiles) {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from("images")
+            .upload(`chat/${fileName}`, file, {
+              contentType: file.type,
+              upsert: false
+            });
+
+          if (uploadError) throw uploadError;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from("images")
+            .getPublicUrl(uploadData.path);
+          
+          imageUrls.push(publicUrl);
+        }
+      } catch (error) {
+        console.error('Image upload error:', error);
+        toast({
+          title: "Upload Error",
+          description: "Failed to upload one or more images. Please try again.",
           variant: "destructive",
         });
         return;
       }
-
-      setImageFile(file);
-      if (onImageSelect) {
-        onImageSelect(file);
-      }
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
     }
-  };
+
+    // Check if the message is a navigation request
+    const navigationMatch = message.match(/From:\s*([^To]+)\s*To:\s*(.+)/i);
+    if (navigationMatch) {
+      const [, from, to] = navigationMatch;
+      const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(from.trim())}&destination=${encodeURIComponent(to.trim())}`;
+      onSend(`🗺️ Here's your route: [Open in Google Maps](${googleMapsUrl})`);
+      setMessage("");
+      return;
+    }
+
+    // Check if the message is asking about weather
+    const weatherKeywords = ['weather', 'temperature', 'forecast'];
+    const isWeatherQuery = weatherKeywords.some(keyword => 
+      message.toLowerCase().includes(keyword)
+    );
+
+    if (isWeatherQuery) {
+      try {
+        const locationMatch = message.match(/(?:weather|temperature|forecast)\s+(?:in|at|for)\s+([^?.,]+)/i);
+        const location = locationMatch ? locationMatch[1].trim() : null;
+
+        if (!location) {
+          onSend("I couldn't determine the location. Please specify a location, for example: 'What's the weather in London?'");
+          return;
+        }
+
+        onSend(`🔍 Checking weather for ${location}...`);
+        
+        const { data, error } = await supabase.functions.invoke('get-weather', {
+          body: { location },
+        });
+
+        if (error) throw error;
+        
+        if (data.message) {
+          onSend(data.message);
+          setMessage("");
+        } else {
+          onSend("Sorry, I couldn't fetch the weather information at this time.");
+        }
+      } catch (error) {
+        console.error('Weather fetch error:', error);
+        toast({
+          title: "Weather Error",
+          description: "Failed to fetch weather information. Please try again.",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
+
+    onSend(message, imageUrls);
+    setMessage("");
+    setImageFiles([]);
+    setImagePreviews([]);
+  }, [message, imageFiles, onSend, toast]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -284,21 +276,23 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
 
   return (
     <div className="flex flex-col gap-2 p-4 border-t bg-background rounded-lg shadow-sm" role="region" aria-label="Message input">
-      {imagePreview && (
-        <ImagePreview 
-          imagePreview={imagePreview}
-          onClear={() => {
-            setImageFile(null);
-            setImagePreview(null);
-          }}
-        />
+      {imagePreviews.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {imagePreviews.map((preview, index) => (
+            <ImagePreview 
+              key={index}
+              imagePreview={preview}
+              onClear={() => handleRemoveImage(index)}
+            />
+          ))}
+        </div>
       )}
       <div className="flex flex-col gap-2">
         <Textarea
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Message CHICHA... (Use words like 'current', 'latest', or 'today' for real-time information)"
+          placeholder={imageFiles.length > 0 ? "Ask about the images..." : "Message CHICHA..."}
           className="min-h-[20px] max-h-[200px] resize-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
           rows={1}
           aria-label="Message input"
@@ -314,7 +308,7 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
           isListening={isListening}
           isLoading={!!isLoading}
           isGeneratingImage={isGeneratingImage}
-          hasContent={!!message.trim() || !!imageFile}
+          hasContent={!!message.trim() || imageFiles.length > 0}
         />
       </div>
       <input
@@ -322,8 +316,9 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
         ref={fileInputRef}
         onChange={handleImageSelect}
         accept="image/*"
+        multiple
         className="hidden"
-        aria-label="Upload image"
+        aria-label="Upload images"
       />
     </div>
   );

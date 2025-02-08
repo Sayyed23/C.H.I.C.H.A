@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -19,8 +20,9 @@ serve(async (req) => {
       throw new Error('GEMINI_API_KEY is not set');
     }
 
-    const { prompt, imageUrl } = await req.json();
+    const { prompt, imageUrls } = await req.json();
     console.log('Received request with prompt:', prompt);
+    console.log('Received image URLs:', imageUrls);
 
     let systemContext = "You are CHICHA, a helpful AI assistant. Provide concise answers in 10-15 lines maximum. If applicable, use numbered points. Avoid special characters and only mention dates/times if specifically asked. Focus on the most relevant information.";
 
@@ -32,21 +34,31 @@ serve(async (req) => {
       }]
     };
 
-    if (imageUrl) {
-      console.log('Processing image URL:', imageUrl);
-      const imageResponse = await fetch(imageUrl);
-      if (!imageResponse.ok) {
-        throw new Error(`Failed to fetch image: ${imageResponse.statusText}`);
-      }
-      const imageData = await imageResponse.blob();
-      const base64Image = await blobToBase64(imageData);
+    // Process multiple images if provided
+    if (imageUrls && Array.isArray(imageUrls)) {
+      console.log('Processing multiple images:', imageUrls.length);
       
-      requestBody.contents[0].parts.push({
-        inlineData: {
-          mimeType: imageData.type,
-          data: base64Image
+      for (const imageUrl of imageUrls) {
+        try {
+          console.log('Processing image URL:', imageUrl);
+          const imageResponse = await fetch(imageUrl);
+          if (!imageResponse.ok) {
+            console.error(`Failed to fetch image: ${imageResponse.statusText}`);
+            continue;
+          }
+          const imageData = await imageResponse.blob();
+          const base64Image = await blobToBase64(imageData);
+          
+          requestBody.contents[0].parts.push({
+            inlineData: {
+              mimeType: imageData.type,
+              data: base64Image
+            }
+          });
+        } catch (error) {
+          console.error('Error processing image:', imageUrl, error);
         }
-      });
+      }
     }
 
     console.log('Sending request to Gemini API');
