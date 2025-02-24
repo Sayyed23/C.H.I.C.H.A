@@ -43,7 +43,7 @@ const Index = () => {
         await createNewChat();
         setMessages([
           {
-            content: "Hi! I'm CHICHA, your friendly AI assistant powered by Gemini. I can search the web to help answer your questions. How can I help you today?",
+            content: "Hi! I'm CHICHA, your friendly AI assistant . How can I help you today?",
             isBot: true,
           },
         ]);
@@ -176,7 +176,7 @@ const Index = () => {
 
       if (formattedMessages.length === 0) {
         formattedMessages.push({
-          content: "Hi! I'm CHICHA, your friendly AI assistant powered by Gemini. I can search the web to help answer your questions. How can I help you today?",
+          content: "Hi! I'm CHICHA, your friendly AI assistant . How can I help you today?",
           isBot: true,
         });
       }
@@ -243,7 +243,7 @@ const Index = () => {
   const handleNewChat = async () => {
     setMessages([
       {
-        content: "Hi! I'm CHICHA, your friendly AI assistant powered by Gemini. I can search the web to help answer your questions. How can I help you today?",
+        content: "Hi! I'm CHICHA, your friendly AI assistant. How can I help you today?",
         isBot: true,
       },
     ]);
