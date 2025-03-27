@@ -1,17 +1,19 @@
 import { Toaster } from "@/components/ui/toaster";
 import { ChatContainer } from "@/components/ChatContainer";
 import { ChatInput } from "@/components/ChatInput";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { LogOut, Plus, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { LogOut, Plus, Trash2, ChevronLeft, ChevronRight, Home } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { useNavigate } from "react-router-dom";
 
 interface Message {
   content: string;
   isBot: boolean;
   isProcessing?: boolean;
+  model?: string;
   sources?: Array<{
     title: string;
     url: string;
@@ -27,12 +29,16 @@ interface ChatHistory {
 }
 
 const Index = () => {
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
-  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
-  const [isButtonVisible, setIsButtonVisible] = useState(true);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(() => {
+    return window.innerWidth >= 768; // Default visible on desktop, hidden on mobile
+  });
+  const [isMobileView, setIsMobileView] = useState(window.innerWidth < 768);
   const { toast } = useToast();
   const { transcript, isListening, startListening, stopListening } = useSpeechRecognition();
 
@@ -43,7 +49,7 @@ const Index = () => {
         await createNewChat();
         setMessages([
           {
-            content: "Hi! I'm CHICHA, your friendly AI assistant . How can I help you today?",
+            content: "Hi! I'm CHICHA, your friendly AI assistant powered by Gemini. I can search the web to help answer your questions. How can I help you today?",
             isBot: true,
           },
         ]);
@@ -61,6 +67,19 @@ const Index = () => {
       handleSendMessage(transcript);
     }
   }, [transcript]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobileView(mobile);
+      if (!mobile && !isSidebarVisible) {
+        setIsSidebarVisible(true);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isSidebarVisible]);
 
   const fetchChatHistory = async () => {
     try {
@@ -176,7 +195,7 @@ const Index = () => {
 
       if (formattedMessages.length === 0) {
         formattedMessages.push({
-          content: "Hi! I'm CHICHA, your friendly AI assistant . How can I help you today?",
+          content: "Hi! I'm CHICHA, your friendly AI assistant powered by Gemini. I can search the web to help answer your questions. How can I help you today?",
           isBot: true,
         });
       }
@@ -193,10 +212,29 @@ const Index = () => {
     }
   };
 
-  const handleSendMessage = async (content: string, imageUrls?: string[]) => {
+  const handleSendMessage = async (content: string, options?: { targetLanguage?: string }) => {
     if (!currentChatId) return;
 
-    setMessages((prev) => [...prev, { content, isBot: false }]);
+    let imageUrl = null;
+    if (selectedImage) {
+      try {
+        imageUrl = await handleImageUpload(selectedImage);
+        setSelectedImage(null);
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to upload image",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    const userMessage = imageUrl 
+      ? `${content}\n![Image](${imageUrl})`
+      : content;
+
+    setMessages((prev) => [...prev, { content: userMessage, isBot: false }]);
     setMessages((prev) => [...prev, { content: "", isBot: true, isProcessing: true }]);
     setIsLoading(true);
 
@@ -205,15 +243,27 @@ const Index = () => {
         .from('messages')
         .insert({
           chat_id: currentChatId,
-          content: content,
+          content: userMessage,
           is_bot: false,
         });
 
       const { data, error } = await supabase.functions.invoke('chat-with-gemini', {
-        body: { prompt: content, imageUrls },
+        body: { 
+          prompt: content, 
+          imageUrl,
+          targetLanguage: options?.targetLanguage,
+          model: "gemini-pro-1.5"
+        },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw new Error(`Supabase function error: ${error.message || 'Unknown error'}`);
+      }
+
+      if (!data || !data.response) {
+        throw new Error('Received empty response from AI');
+      }
 
       await supabase
         .from('messages')
@@ -225,16 +275,40 @@ const Index = () => {
 
       setMessages((prev) => [
         ...prev.slice(0, -1),
-        { content: data.response, isBot: true, sources: data.sources || [] },
+        { 
+          content: data.response, 
+          isBot: true, 
+          sources: data.sources || [],
+          model: data.model || "gemini-pro-1.5"
+        },
       ]);
     } catch (error) {
       console.error('Error calling Gemini:', error);
+      
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Unknown error occurred';
+      
       toast({
-        title: "Error",
-        description: "Failed to get response from AI",
+        title: "AI Response Error",
+        description: `Failed to get response from AI. ${errorMessage}`,
         variant: "destructive",
       });
-      setMessages((prev) => prev.slice(0, -1));
+      
+      setMessages((prev) => {
+        if (prev.length > 0 && prev[prev.length - 1].isBot && prev[prev.length - 1].isProcessing) {
+          return prev.slice(0, -1);
+        }
+        return prev;
+      });
+      
+      setMessages((prev) => [
+        ...prev,
+        { 
+          content: "I'm sorry, I encountered an issue processing your request. Please try again or rephrase your question.", 
+          isBot: true 
+        },
+      ]);
     } finally {
       setIsLoading(false);
     }
@@ -243,7 +317,7 @@ const Index = () => {
   const handleNewChat = async () => {
     setMessages([
       {
-        content: "Hi! I'm CHICHA, your friendly AI assistant. How can I help you today?",
+        content: "Hi! I'm CHICHA, your friendly AI assistant powered by Gemini. I can search the web to help answer your questions. How can I help you today?",
         isBot: true,
       },
     ]);
@@ -269,18 +343,46 @@ const Index = () => {
   };
 
   return (
-    <div className="flex h-screen bg-background">
-      {isSidebarVisible && (
-        <div className="w-[20%] min-w-[250px] h-full border-r border-border bg-card p-4 flex flex-col">
-          <Button 
-            variant="outline" 
-            onClick={toggleSidebar} 
-            size="sm" 
-            className="mb-4 self-end"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
+    <div className="flex h-screen bg-background overflow-hidden">
+      {/* Backdrop overlay for mobile */}
+      {isMobileView && isSidebarVisible && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-30"
+          onClick={() => setIsSidebarVisible(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside 
+        className={`
+          ${isMobileView ? 'fixed' : 'relative'} 
+          z-40 h-full w-[250px]
+          transition-all duration-300 ease-in-out
+          ${isSidebarVisible ? 'translate-x-0' : '-translate-x-full'}
+        `}
+      >
+        <div className="w-full h-full border-r border-border bg-card p-2 md:p-4 flex flex-col">
+          {/* Close button - only on mobile */}
+          {isMobileView && (
+            <Button 
+              variant="ghost" 
+              onClick={() => setIsSidebarVisible(false)} 
+              size="sm" 
+              className="mb-4 self-end"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+          )}
+          
           <div className="space-y-4">
+            <Button 
+              variant="outline" 
+              onClick={() => navigate("/home")} 
+              className="w-full flex items-center gap-2"
+            >
+              <Home className="h-4 w-4" />
+              Back to Home
+            </Button>
             <Button 
               variant="outline" 
               onClick={handleNewChat} 
@@ -320,50 +422,97 @@ const Index = () => {
             Logout
           </Button>
         </div>
-      )}
-      {!isSidebarVisible && isButtonVisible && (
-        <div 
-          className="absolute top-4 left-0 h-10 w-10 flex items-center justify-center hover:w-12 hover:h-12 transition-all duration-300"
-          onMouseEnter={() => setIsSidebarVisible(true)}
-          onMouseLeave={() => setIsButtonVisible(false)}
+      </aside>
+
+      {/* Toggle button - visible when sidebar is hidden */}
+      {!isSidebarVisible && (
+        <button
+          className="fixed z-50 top-4 left-4 p-2 bg-background/95 border border-border rounded-md shadow-md hover:bg-accent transition-colors"
+          onClick={() => setIsSidebarVisible(true)}
         >
-          <Button 
-            variant="outline" 
-            onClick={toggleSidebar} 
-            size="sm"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
+          <ChevronRight className="h-4 w-4" />
+        </button>
       )}
 
-      <div className="flex-1 flex flex-col h-full p-4" style={{ width: isSidebarVisible ? '80%' : '100%' }}>
-        <div className="mb-4 text-center">
+      {/* Main content area */}
+      <div 
+        className="flex-1 flex flex-col h-full w-full overflow-hidden transition-all duration-300 ease-in-out"
+        style={{
+          marginLeft: isMobileView ? 0 : (isSidebarVisible ? '0' : '0'),
+        }}
+      >
+        {/* Header section */}
+        <div className="mb-2 md:mb-4 text-center flex items-center justify-between w-full">
+          <div className="flex-1 flex items-center">
+            {isSidebarVisible && (
+              <Button 
+                variant="ghost" 
+                onClick={toggleSidebar}
+                className="md:hidden mr-2"
+                size="sm"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+          
           <div className="flex items-center justify-center gap-2">
             <img 
               src="/lovable-uploads/8af0d91e-2677-445f-9de9-657b8af84348.png" 
               alt="CHICHA Logo" 
-              className="w-16 h-16 object-contain"
+              className="w-10 h-10 md:w-16 md:h-16 object-contain"
             />
-            <h1 className="text-2xl font-bold tracking-tight text-primary whitespace-nowrap overflow-hidden text-ellipsis">
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-primary">
               CHICHA
             </h1>
           </div>
-          <p className="text-sm text-muted-foreground mt-2">
-            Your AI Assistant with Web Search (Powered by Gemini)
-          </p>
+          
+          <div className="flex-1 flex justify-end">
+            <Button 
+              variant="outline" 
+              onClick={handleNewChat}
+              size="sm"
+              className="ml-auto"
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden md:inline ml-1">New Chat</span>
+            </Button>
+          </div>
         </div>
 
+        <p className="text-xs md:text-sm text-muted-foreground text-center mb-2 md:mb-4">
+          Your AI Assistant with Web Search (Powered by Gemini)
+        </p>
+
+        {/* Chat container */}
         <div className="flex-1 overflow-hidden rounded-lg border bg-card shadow-sm">
           <ChatContainer messages={messages} />
         </div>
 
-        <div className="mt-4">
+        {/* Input section */}
+        <div className="mt-2 md:mt-4">
           <ChatInput 
             onSend={handleSendMessage} 
-            isLoading={isLoading} 
+            isLoading={isLoading}
+            onImageSelect={setSelectedImage}
           />
         </div>
+
+        {/* Selected image indicator */}
+        {selectedImage && (
+          <div className="mt-2 flex items-center gap-2 text-xs md:text-sm">
+            <span className="text-muted-foreground truncate">
+              {selectedImage.name}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedImage(null)}
+            >
+              Remove
+            </Button>
+          </div>
+        )}
       </div>
 
       <Toaster />

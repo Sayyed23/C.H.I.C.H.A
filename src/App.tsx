@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import Index from "./pages/Index";
+import Home from "./pages/Home";
 import AuthPage from "./pages/Auth";
 import { useToast } from "./hooks/use-toast";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -21,22 +23,7 @@ const App = () => {
     const checkSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) {
-          console.error('Error checking session:', error);
-          toast({
-            title: "Authentication Error",
-            description: "There was an error checking your session. Please try logging in again.",
-            variant: "destructive",
-          });
-          setIsAuthenticated(false);
-          return;
-        }
-
-        // If we have a session, store the refresh token
-        if (session?.refresh_token) {
-          localStorage.setItem('supabase.auth.token', session.refresh_token);
-        }
-        
+        if (error) throw error;
         setIsAuthenticated(!!session);
       } catch (error) {
         console.error('Session check error:', error);
@@ -47,41 +34,17 @@ const App = () => {
     checkSession();
 
     // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('Auth state changed:', event);
       
       if (event === 'SIGNED_OUT') {
         setIsAuthenticated(false);
-        // Clear all auth-related data
-        localStorage.removeItem('supabase.auth.token');
-        queryClient.clear();
-        
-        toast({
-          title: "Signed Out",
-          description: "You have been successfully signed out.",
-        });
+        queryClient.clear(); // Clear React Query cache
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-        if (session?.refresh_token) {
-          localStorage.setItem('supabase.auth.token', session.refresh_token);
-          setIsAuthenticated(true);
-          
-          if (event === 'SIGNED_IN') {
-            toast({
-              title: "Welcome Back!",
-              description: "You have successfully signed in.",
-            });
-          }
-        }
-      } else if (event === 'INITIAL_SESSION') {
-        // Handle initial session
         setIsAuthenticated(!!session);
-        if (session?.refresh_token) {
-          localStorage.setItem('supabase.auth.token', session.refresh_token);
-        }
       }
     });
 
-    // Cleanup function
     return () => {
       subscription.unsubscribe();
     };
@@ -106,8 +69,16 @@ const App = () => {
             <BrowserRouter>
               <Routes>
                 <Route
-                  path="/"
+                  path="/home"
+                  element={isAuthenticated ? <Home /> : <Navigate to="/auth" />}
+                />
+                <Route
+                  path="/chat"
                   element={isAuthenticated ? <Index /> : <Navigate to="/auth" />}
+                />
+                <Route
+                  path="/"
+                  element={isAuthenticated ? <Home /> : <Navigate to="/auth" />}
                 />
                 <Route
                   path="/auth"

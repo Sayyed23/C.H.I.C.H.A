@@ -1,147 +1,142 @@
+// For TypeScript support while editing, using Deno URL imports
+import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.1.3";
+import { corsHeaders } from "../_shared/cors.ts";
 
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+// Initialize Gemini with API key
+const genAI = new GoogleGenerativeAI(Deno.env.get("GEMINI_API_KEY")!);
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+// Simple translation function
+async function translateText(text: string, targetLanguage: string, modelName = "gemini-pro-1.5") {
+  if (!targetLanguage) return { translatedText: text };
 
-console.log("chat-with-gemini function started");
+  console.log(`Translating to ${targetLanguage} using ${modelName}`);
+  try {
+    // Use the specified model for translation
+    const translationModel = genAI.getGenerativeModel({ model: modelName });
+    const prompt = `Translate the following text to ${targetLanguage}. Respond with only the translated text:
+    
+    "${text}"`;
+    
+    const result = await translationModel.generateContent(prompt);
+    const translatedText = result.response.text();
+    return { translatedText };
+  } catch (error) {
+    console.error("Translation error:", error);
+    return { error: "Translation failed", translatedText: text };
+  }
+}
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const apiKey = Deno.env.get('GEMINI_API_KEY');
-    if (!apiKey) {
-      throw new Error('GEMINI_API_KEY is not set');
-    }
+    const { prompt, imageUrl, voice, targetLanguage, model: requestedModel } = await req.json();
+    
+    // Use the requested model or default to gemini-pro-1.5
+    const modelName = requestedModel || "gemini-pro-1.5";
+    console.log(`Using model: ${modelName}`);
+    
+    // Get the appropriate model
+    const model = genAI.getGenerativeModel({ model: modelName });
+    
+    // Check if this is a code generation request
+    const isCodeRequest = prompt.toLowerCase().includes("generate code") || 
+                         prompt.toLowerCase().includes("write code") ||
+                         prompt.toLowerCase().includes("code example") ||
+                         prompt.toLowerCase().includes("programming") ||
+                         prompt.toLowerCase().includes("function") ||
+                         prompt.toLowerCase().includes("implementation");
 
-    const { prompt, imageUrls } = await req.json();
-    console.log('Received request with prompt:', prompt);
-    console.log('Received image URLs:', imageUrls);
+    // Check if it's a translation request
+    const isTranslationRequest = prompt.toLowerCase().includes("translate") ||
+                                prompt.toLowerCase().includes("translation") ||
+                                prompt.toLowerCase().includes("convert to") ||
+                                prompt.toLowerCase().includes("in hindi") ||
+                                prompt.toLowerCase().includes("in marathi") ||
+                                prompt.toLowerCase().includes("in sanskrit");
 
-    let systemContext = "You are CHICHA, a helpful AI assistant. Provide concise answers in 10-15 lines maximum. If applicable, use numbered points. Avoid special characters and only mention dates/times if specifically asked. Focus on the most relevant information.";
-
-    const requestBody = {
-      contents: [{
-        parts: [{
-          text: `${systemContext}\n\nUser's question: ${prompt}`
-        }]
-      }]
-    };
-
-    // Process multiple images if provided
-    if (imageUrls && Array.isArray(imageUrls)) {
-      console.log('Processing multiple images:', imageUrls.length);
+    // Enhance prompt for code generation
+    let enhancedPrompt = prompt;
+    if (isCodeRequest) {
+      enhancedPrompt = `As a coding assistant, please help with the following request. 
+      Provide clean, well-documented code with explanations.
+      Include:
+      - Code implementation
+      - Brief explanation of the approach
+      - Best practices and considerations
+      - Any important notes about error handling or edge cases
       
-      for (const imageUrl of imageUrls) {
-        try {
-          console.log('Processing image URL:', imageUrl);
-          const imageResponse = await fetch(imageUrl);
-          if (!imageResponse.ok) {
-            console.error(`Failed to fetch image: ${imageResponse.statusText}`);
-            continue;
-          }
-          const imageData = await imageResponse.blob();
-          const base64Image = await blobToBase64(imageData);
-          
-          requestBody.contents[0].parts.push({
-            inlineData: {
-              mimeType: imageData.type,
-              data: base64Image
-            }
-          });
-        } catch (error) {
-          console.error('Error processing image:', imageUrl, error);
-        }
-      }
+      Request: ${prompt}`;
+    } else if (isTranslationRequest) {
+      enhancedPrompt = `As a multilingual assistant, please translate the following text accurately while preserving meaning and context:
+      
+      Text: ${prompt}
+      
+      If the target language isn't specified, please ask which language to translate to.`;
+    } else if (voice === "assistant") {
+      enhancedPrompt = `As CHICHA, a helpful virtual assistant, please respond in a friendly, conversational tone to the following:
+      
+      ${prompt}
+      
+      Provide concise but comprehensive responses and offer follow-up suggestions when appropriate.`;
     }
 
-    console.log('Sending request to Gemini API');
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+    const chat = model.startChat({
+      history: [
+        {
+          role: "user",
+          parts: "You are CHICHA, a helpful AI assistant powered by Gemini. You're knowledgeable about technology, programming, web development, and general knowledge topics. When providing code examples, always format them properly with markdown and include explanations. For translations, preserve the original meaning as much as possible.",
         },
-        body: JSON.stringify(requestBody),
-      }
-    );
+        {
+          role: "model",
+          parts: "I understand. I'll help users with their questions and requests across various domains including technology, programming, and general knowledge. I'll provide well-formatted code with clear explanations when needed, and accurate translations that preserve the original meaning. I'll use markdown for proper formatting and ensure my responses are clear, helpful, and conversational.",
+        },
+      ],
+    });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Gemini API error response:', {
-        status: response.status,
-        statusText: response.statusText,
-        body: errorText
-      });
-      throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
-    }
+    const result = await chat.sendMessage(enhancedPrompt);
+    let response = result.response.text();
 
-    const data = await response.json();
-    console.log('Received response from Gemini API:', data);
+    console.log("Generated response:", response);
 
-    if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
-      throw new Error('Invalid response format from Gemini API');
-    }
-
-    const result = data.candidates[0].content.parts[0].text;
-    const urlPattern = /(https?:\/\/[^\s]+)/g;
-    const urls = result.match(urlPattern) || [];
-
-    const sources = urls.map(url => {
+    // Translate the response if targetLanguage is provided
+    if (targetLanguage) {
+      console.log(`Translating response to ${targetLanguage}`);
       try {
-        const domain = new URL(url).hostname;
-        return {
-          title: domain,
-          url: url,
-          domain: domain,
-          icon: `https://www.google.com/s2/favicons?domain=${domain}`
-        };
-      } catch (e) {
-        console.error('Error processing URL:', e);
-        return null;
+        const translationResult = await translateText(response, targetLanguage, modelName);
+        
+        if (translationResult.translatedText) {
+          console.log("Translation successful");
+          response = translationResult.translatedText;
+        } else if (translationResult.error) {
+          console.error("Translation error:", translationResult.error);
+          // Continue with original response if translation fails
+        }
+      } catch (translationError) {
+        console.error("Error during translation:", translationError);
+        // Continue with original response if translation fails
       }
-    }).filter(Boolean);
+    }
 
     return new Response(
-      JSON.stringify({ 
-        response: result,
-        sources: sources.length > 0 ? sources : undefined
+      JSON.stringify({
+        response: response,
+        model: modelName,
       }),
-      { 
-        headers: { 
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        } 
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   } catch (error) {
-    console.error('Error in chat-with-gemini function:', error);
+    console.error("Error:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { 
+      {
         status: 500,
-        headers: { 
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        } 
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   }
 });
-
-async function blobToBase64(blob: Blob): Promise<string> {
-  const buffer = await blob.arrayBuffer();
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}

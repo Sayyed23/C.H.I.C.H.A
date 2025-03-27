@@ -4,6 +4,14 @@ import { ChatMessage } from "./ChatMessage";
 interface Message {
   content: string;
   isBot: boolean;
+  isProcessing?: boolean;
+  model?: string;
+  sources?: Array<{
+    title: string;
+    url: string;
+    domain: string;
+    icon?: string;
+  }>;
 }
 
 interface ChatContainerProps {
@@ -28,6 +36,9 @@ export const ChatContainer = ({ messages }: ChatContainerProps) => {
           key={index}
           content={message.content}
           isBot={message.isBot}
+          isProcessing={message.isProcessing}
+          sources={message.sources}
+          model={message.model}
         />
       ))}
       <div ref={bottomRef} />

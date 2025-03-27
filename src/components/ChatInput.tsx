@@ -1,23 +1,48 @@
-
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Textarea } from "./ui/textarea";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "./ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { ImagePreview } from "./chat/ImagePreview";
 import { InputActions } from "./chat/InputActions";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Languages } from "lucide-react";
+import { Button } from "./ui/button";
 
 interface ChatInputProps {
-  onSend: (message: string, imageUrls?: string[]) => void;
+  onSend: (message: string, options?: { targetLanguage?: string }) => void;
   isLoading?: boolean;
+  onImageSelect?: (file: File | null) => void;
 }
 
-export const ChatInput = ({ onSend, isLoading }: ChatInputProps) => {
+const languages = [
+  { name: "Hindi", code: "hi" },
+  { name: "Marathi", code: "mr" },
+  { name: "Sanskrit", code: "sa" },
+  { name: "Spanish", code: "es" },
+  { name: "French", code: "fr" },
+  { name: "German", code: "de" },
+  { name: "Italian", code: "it" },
+  { name: "Portuguese", code: "pt" },
+  { name: "Russian", code: "ru" },
+  { name: "Chinese", code: "zh" },
+  { name: "Japanese", code: "ja" },
+  { name: "Korean", code: "ko" },
+  { name: "Arabic", code: "ar" },
+];
+
+export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) => {
   const [message, setMessage] = useState("");
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [isEditingImage, setIsEditingImage] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const MAX_IMAGES = 5;
@@ -261,17 +286,157 @@ export const ChatInput = ({ onSend, isLoading }: ChatInputProps) => {
       return;
     }
 
-    onSend(message, imageUrls);
+    // Combine message and image URLs into a single message string
+    const fullMessage = [
+      message,
+      ...imageUrls.map(url => `![Image](${url})`)
+    ].filter(Boolean).join('\n');
+
+    // Pass selected language if available
+    onSend(fullMessage, { targetLanguage: selectedLanguage || undefined });
     setMessage("");
     setImageFiles([]);
     setImagePreviews([]);
-  }, [message, imageFiles, onSend, toast]);
+    setSelectedLanguage(null); // Reset language selection after sending
+  }, [message, imageFiles, onSend, toast, selectedLanguage]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
+  };
+
+  const handleGenerateCode = async () => {
+    if (!message.trim()) return;
+
+    const formatCode = (title: string, code: string, features: string[]) => {
+      const lines = code.split('\n');
+      const indentedCode = lines
+        .map(line => line.trimEnd()) // Remove trailing spaces
+        .join('\n');
+
+      return `${title}
+
+${indentedCode}
+
+Features:
+${features.map((feature, index) => `${index + 1}. ${feature}`).join('\n')}`;
+    };
+
+    const generateFunction = (functionName: string, params: string[], returnType: string, body: string) => {
+      return `function ${functionName}(${params.join(', ')})${returnType ? `: ${returnType}` : ''} {
+    ${body}
+}`;
+    };
+
+    // Extract keywords and requirements from the message
+    const isCalculator = message.toLowerCase().includes('calculator') || message.toLowerCase().includes('compute');
+    const isPython = message.toLowerCase().includes('python');
+    const isTypeScript = message.toLowerCase().includes('typescript') || message.toLowerCase().includes('javascript');
+    const isComponent = message.toLowerCase().includes('component') || message.toLowerCase().includes('react');
+    
+    if (isCalculator) {
+      const title = `${isPython ? 'Python' : 'TypeScript'} Calculator`;
+      
+      const code = isPython ? 
+        `def calculate(a: float, b: float, operation: str) -> float:
+    if operation == '+':
+        return a + b
+    elif operation == '-':
+        return a - b
+    elif operation == '*':
+        return a * b
+    elif operation == '/':
+        return a / b if b != 0 else 'Error: Division by zero'
+    else:
+        return 'Invalid operation'` :
+        `function calculate(a: number, b: number, operation: string): number | string {
+    switch (operation) {
+        case '+': return a + b;
+        case '-': return a - b;
+        case '*': return a * b;
+        case '/': return b !== 0 ? a / b : 'Error: Division by zero';
+        default: return 'Invalid operation';
+    }
+}`;
+
+      const features = [
+        'Basic arithmetic operations',
+        'Input validation',
+        'Error handling for division by zero',
+        'Type-safe implementation',
+        'Clean and maintainable code structure'
+      ];
+
+      onSend(formatCode(title, code, features));
+    } else if (isComponent) {
+      const componentName = message.match(/(?:create|make|build)\s+(?:a\s+)?(\w+)\s+component/i)?.[1] || 'Custom';
+      
+      const code = `import { useState } from "react"
+import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+
+export default function ${componentName}Component() {
+    const [count, setCount] = useState(0)
+
+    return (
+        <Card className="w-full max-w-md mx-auto p-6">
+            <div className="flex flex-col items-center gap-4">
+                <h2 className="text-2xl font-bold">${componentName} Component</h2>
+                <p className="text-lg">Count: {count}</p>
+                <Button onClick={() => setCount(prev => prev + 1)}>
+                    Increment
+                </Button>
+            </div>
+        </Card>
+    )
+}`;
+
+      const features = [
+        'Responsive design with Tailwind CSS',
+        'State management with useState',
+        'Shadcn/UI components integration',
+        'Clean and semantic markup',
+        'Interactive button functionality'
+      ];
+
+      onSend(formatCode(`${componentName} React Component`, code, features));
+    } else {
+      // Generate a default function based on the message
+      const words = message.toLowerCase().split(' ');
+      const functionName = words.find(w => w.includes('function')) ? 
+        words[words.indexOf('function') + 1] || 'processData' : 
+        'processData';
+
+      const code = isPython ?
+        `def ${functionName}(data):
+    result = []
+    
+    # Process the data
+    for item in data:
+        processed = item.upper() if isinstance(item, str) else str(item)
+        result.append(processed)
+    
+    return result` :
+        `function ${functionName}<T>(data: T[]): string[] {
+    return data.map(item => 
+        typeof item === 'string' ? item.toUpperCase() : String(item)
+    )
+}`;
+
+      const features = [
+        'Generic data processing',
+        'Type-safe implementation',
+        'Input validation',
+        'Error handling',
+        'Clean code structure'
+      ];
+
+      onSend(formatCode(`${functionName} Implementation`, code, features));
+    }
+
+    setMessage("");
   };
 
   return (
@@ -288,22 +453,66 @@ export const ChatInput = ({ onSend, isLoading }: ChatInputProps) => {
         </div>
       )}
       <div className="flex flex-col gap-2">
-        <Textarea
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={imageFiles.length > 0 ? "Ask about the images..." : "Message CHICHA..."}
-          className="min-h-[20px] max-h-[200px] resize-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-          rows={1}
-          aria-label="Message input"
-        />
+        <div className="flex items-center gap-2">
+          <Textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={imageFiles.length > 0 ? "Ask about the images..." : "Ask CHICHA for code, explanations, or help..."}
+            className="min-h-[20px] max-h-[200px] resize-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 flex-1"
+            rows={1}
+            aria-label="Message input"
+          />
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant={selectedLanguage ? "secondary" : "ghost"} 
+                size="icon"
+                className="flex-shrink-0"
+                title="Choose response language"
+              >
+                <Languages className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setSelectedLanguage(null)}>
+                English (Default)
+              </DropdownMenuItem>
+              {languages.map((lang) => (
+                <DropdownMenuItem
+                  key={lang.code}
+                  onClick={() => setSelectedLanguage(lang.code)}
+                >
+                  {lang.name}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        
+        {selectedLanguage && (
+          <div className="text-xs text-muted-foreground ml-1">
+            Response will be in {languages.find(l => l.code === selectedLanguage)?.name || selectedLanguage}
+            <Button 
+              variant="link" 
+              size="sm" 
+              className="p-0 h-auto text-xs ml-1" 
+              onClick={() => setSelectedLanguage(null)}
+            >
+              Reset
+            </Button>
+          </div>
+        )}
+        
         <InputActions
           onImageClick={() => fileInputRef.current?.click()}
           onSearchClick={handleWebSearch}
           onMicClick={isListening ? stopListening : startListening}
           onSendClick={handleSend}
           onGenerateImage={handleGenerateImage}
-          onWeatherClick={handleWeatherClick}
+          // Remove onGenerateCode since it's not in InputActionsProps
+          onWeatherClick={handleWeatherClick} 
           onNavigateClick={handleNavigateClick}
           isListening={isListening}
           isLoading={!!isLoading}

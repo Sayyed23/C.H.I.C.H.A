@@ -24,6 +24,7 @@ interface ChatMessageProps {
   content: string;
   isBot?: boolean;
   isProcessing?: boolean;
+  model?: string;
   sources?: Array<{
     title: string;
     url: string;
@@ -42,7 +43,8 @@ export const ChatMessage = ({
   content, 
   isBot = false, 
   isProcessing = false,
-  sources
+  sources,
+  model
 }: ChatMessageProps) => {
   const [translatedContent, setTranslatedContent] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
@@ -283,6 +285,11 @@ export const ChatMessage = ({
               >
                 Show Original
               </Button>
+            )}
+            {model && (
+              <span className="text-xs text-muted-foreground ml-auto">
+                Powered by {model}
+              </span>
             )}
           </div>
         )}

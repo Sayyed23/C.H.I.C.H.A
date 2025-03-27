@@ -14,7 +14,7 @@ import {
   import { LogOut, Plus, Trash2 } from "lucide-react"
   import { Button } from "./ui/button"
   import { supabase } from "@/integrations/supabase/client"
-  import { useToast } from "./ui/use-toast"
+  import { useToast } from "@/hooks/use-toast"
   
   interface ChatHistory {
     id: string;
