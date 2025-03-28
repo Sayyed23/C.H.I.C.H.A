@@ -4,7 +4,7 @@ import { ChatInput } from "@/components/ChatInput";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { LogOut, Plus, Trash2, ChevronLeft, ChevronRight, Home } from "lucide-react";
+import { LogOut, Plus, Trash2, ChevronLeft, ChevronRight, Home, Globe } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { useNavigate } from "react-router-dom";
@@ -14,6 +14,7 @@ interface Message {
   isBot: boolean;
   isProcessing?: boolean;
   model?: string;
+  translatedTo?: string;
   sources?: Array<{
     title: string;
     url: string;
@@ -49,7 +50,7 @@ const Index = () => {
         await createNewChat();
         setMessages([
           {
-            content: "Hi! I'm CHICHA, your friendly AI assistant  How can I help you today?",
+            content: "Hi! I'm CHICHA, your friendly AI assistant. I can search the web to help answer your questions and translate content into multiple languages including English, Hindi, Marathi, Sanskrit, Urdu (اردو), and Arabic (العربية). How can I help you today?",
             isBot: true,
           },
         ]);
@@ -195,7 +196,7 @@ const Index = () => {
 
       if (formattedMessages.length === 0) {
         formattedMessages.push({
-          content: "Hi! I'm CHICHA, your friendly AI assistant. How can I help you today?",
+          content: "Hi! I'm CHICHA, your friendly AI assistant. I can search the web to help answer your questions and translate content into multiple languages including English, Hindi, Marathi, Sanskrit, Urdu (اردو), and Arabic (العربية). How can I help you today?",
           isBot: true,
         });
       }
@@ -214,6 +215,42 @@ const Index = () => {
 
   const handleSendMessage = async (content: string, options?: { targetLanguage?: string }) => {
     if (!currentChatId) return;
+
+    // Check if user is requesting a response in a specific language
+    const promptLower = content.toLowerCase();
+    let detectedLanguage = options?.targetLanguage;
+    
+    // Detect language requests in the prompt
+    if (promptLower.includes("in urdu") || promptLower.includes("to urdu") || 
+        promptLower.includes("respond in urdu") || promptLower.includes("answer in urdu") || 
+        promptLower.includes("reply in urdu") || promptLower.includes("using urdu") ||
+        promptLower.includes("speak urdu") || promptLower.includes("in the urdu language") || 
+        promptLower.includes("urdu language") || promptLower.includes("urdu translation")) {
+      detectedLanguage = "ur";
+    } else if (promptLower.includes("in hindi") || promptLower.includes("to hindi") || 
+               promptLower.includes("respond in hindi") || promptLower.includes("answer in hindi") ||
+               promptLower.includes("speak hindi") || promptLower.includes("in the hindi language")) {
+      detectedLanguage = "hi";
+    } else if (promptLower.includes("in marathi") || promptLower.includes("to marathi") || 
+               promptLower.includes("respond in marathi") || promptLower.includes("answer in marathi") ||
+               promptLower.includes("in the marathi language")) {
+      detectedLanguage = "mr";
+    } else if (promptLower.includes("in sanskrit") || promptLower.includes("to sanskrit") || 
+               promptLower.includes("respond in sanskrit") || promptLower.includes("answer in sanskrit") ||
+               promptLower.includes("in the sanskrit language")) {
+      detectedLanguage = "sa";
+    } else if (promptLower.includes("in english") || promptLower.includes("to english") || 
+               promptLower.includes("respond in english") || promptLower.includes("answer in english") || 
+               promptLower.includes("reply in english") || promptLower.includes("using english") ||
+               promptLower.includes("speak english") || promptLower.includes("in the english language")) {
+      detectedLanguage = "en";
+    } else if (promptLower.includes("in arabic") || promptLower.includes("to arabic") || 
+               promptLower.includes("respond in arabic") || promptLower.includes("answer in arabic") || 
+               promptLower.includes("reply in arabic") || promptLower.includes("using arabic") ||
+               promptLower.includes("speak arabic") || promptLower.includes("in the arabic language") ||
+               promptLower.includes("arabic language")) {
+      detectedLanguage = "ar";
+    }
 
     let imageUrl = null;
     if (selectedImage) {
@@ -251,7 +288,7 @@ const Index = () => {
         body: { 
           prompt: content, 
           imageUrl,
-          targetLanguage: options?.targetLanguage,
+          targetLanguage: detectedLanguage,
           model: "gemini-pro-1.5"
         },
       });
@@ -279,7 +316,8 @@ const Index = () => {
           content: data.response, 
           isBot: true, 
           sources: data.sources || [],
-          model: data.model || "gemini-pro-1.5"
+          model: data.model || "gemini-pro-1.5",
+          translatedTo: data.translatedTo
         },
       ]);
     } catch (error) {
@@ -317,7 +355,7 @@ const Index = () => {
   const handleNewChat = async () => {
     setMessages([
       {
-        content: "Hi! I'm CHICHA, your friendly AI assistant powered by Gemini. I can search the web to help answer your questions. How can I help you today?",
+        content: "Hi! I'm CHICHA, your friendly AI assistant powered by Gemini. I can search the web to help answer your questions and translate content into multiple languages including English, Hindi, Marathi, Sanskrit, Urdu (اردو), and Arabic (العربية). How can I help you today?",
         isBot: true,
       },
     ]);
@@ -481,7 +519,7 @@ const Index = () => {
         </div>
 
         <p className="text-xs md:text-sm text-muted-foreground text-center mb-2 md:mb-4">
-          Your AI Assistant with Web Search (Powered by Gemini)
+          Your AI Assistant with Web Search and Translation (English, Hindi, Marathi, Sanskrit, Urdu, Arabic)
         </p>
 
         {/* Chat container */}

@@ -49,13 +49,50 @@ Deno.serve(async (req) => {
                          prompt.toLowerCase().includes("function") ||
                          prompt.toLowerCase().includes("implementation");
 
+    // Detect language request patterns
+    const promptLower = prompt.toLowerCase();
+    
+    // Check if the user is requesting a specific language
+    const requestedLanguage = promptLower.includes("in urdu") || promptLower.includes("to urdu") || 
+                             promptLower.includes("using urdu") || promptLower.includes("speak urdu") || 
+                             promptLower.includes("in the urdu language") || promptLower.includes("urdu language") || 
+                             promptLower.includes("urdu translation") ? "ur" :
+                              promptLower.includes("in hindi") || promptLower.includes("to hindi") || 
+                              promptLower.includes("using hindi") || promptLower.includes("speak hindi") ||
+                              promptLower.includes("in the hindi language") ? "hi" :
+                              promptLower.includes("in marathi") || promptLower.includes("to marathi") || 
+                              promptLower.includes("using marathi") || promptLower.includes("in the marathi language") ? "mr" :
+                              promptLower.includes("in sanskrit") || promptLower.includes("to sanskrit") || 
+                              promptLower.includes("using sanskrit") || promptLower.includes("in the sanskrit language") ? "sa" :
+                              promptLower.includes("in english") || promptLower.includes("to english") || 
+                              promptLower.includes("using english") || promptLower.includes("speak english") ||
+                              promptLower.includes("in the english language") ? "en" :
+                              promptLower.includes("in arabic") || promptLower.includes("to arabic") || 
+                              promptLower.includes("using arabic") || promptLower.includes("speak arabic") ||
+                              promptLower.includes("in the arabic language") || promptLower.includes("arabic language") ? "ar" :
+                              null;
+    
     // Check if it's a translation request
-    const isTranslationRequest = prompt.toLowerCase().includes("translate") ||
-                                prompt.toLowerCase().includes("translation") ||
-                                prompt.toLowerCase().includes("convert to") ||
-                                prompt.toLowerCase().includes("in hindi") ||
-                                prompt.toLowerCase().includes("in marathi") ||
-                                prompt.toLowerCase().includes("in sanskrit");
+    const isTranslationRequest = promptLower.includes("translate") ||
+                                promptLower.includes("translation") ||
+                                promptLower.includes("convert to") ||
+                                promptLower.includes("in hindi") ||
+                                promptLower.includes("in marathi") ||
+                                promptLower.includes("in sanskrit") ||
+                                promptLower.includes("in urdu") ||
+                                promptLower.includes("in english") ||
+                                promptLower.includes("in arabic") ||
+                                promptLower.includes("arabic language") ||
+                                promptLower.includes("respond in urdu") ||
+                                promptLower.includes("answer in urdu") ||
+                                promptLower.includes("reply in urdu") ||
+                                promptLower.includes("speak urdu") ||
+                                promptLower.includes("respond in english") ||
+                                promptLower.includes("answer in english") ||
+                                promptLower.includes("reply in english") ||
+                                promptLower.includes("respond in arabic") ||
+                                promptLower.includes("answer in arabic") ||
+                                promptLower.includes("reply in arabic");
 
     // Enhance prompt for code generation
     let enhancedPrompt = prompt;
@@ -101,11 +138,13 @@ Deno.serve(async (req) => {
 
     console.log("Generated response:", response);
 
-    // Translate the response if targetLanguage is provided
-    if (targetLanguage) {
-      console.log(`Translating response to ${targetLanguage}`);
+    // Translate the response if targetLanguage is provided or requested in prompt
+    const finalTargetLanguage = targetLanguage || requestedLanguage;
+    
+    if (finalTargetLanguage) {
+      console.log(`Translating response to ${finalTargetLanguage}`);
       try {
-        const translationResult = await translateText(response, targetLanguage, modelName);
+        const translationResult = await translateText(response, finalTargetLanguage, modelName);
         
         if (translationResult.translatedText) {
           console.log("Translation successful");
@@ -124,6 +163,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         response: response,
         model: modelName,
+        translatedTo: finalTargetLanguage
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

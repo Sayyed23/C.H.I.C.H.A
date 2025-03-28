@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai";
 import { corsHeaders } from "../_shared/cors.ts";
@@ -30,15 +29,11 @@ serve(async (req) => {
       'sa': 'Sanskrit',
       'es': 'Spanish',
       'fr': 'French',
-      'de': 'German',
-      'it': 'Italian',
-      'pt': 'Portuguese',
-      'ru': 'Russian',
-      'zh': 'Chinese',
       'ja': 'Japanese',
       'ko': 'Korean',
       'ar': 'Arabic',
-      'ur':'urdu',
+      'ur': 'Urdu',
+      'en': 'English',
     };
     
     const targetLang = languageMap[targetLanguage] || targetLanguage;

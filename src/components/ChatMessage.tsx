@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Check, Download, Languages, X } from "lucide-react";
+import { Check, Download, Languages, X, Globe } from "lucide-react";
 import { ProcessingState } from "./ProcessingState";
 import { SearchResults } from "./SearchResults";
 import { Button } from "./ui/button";
@@ -25,6 +25,7 @@ interface ChatMessageProps {
   isBot?: boolean;
   isProcessing?: boolean;
   model?: string;
+  translatedTo?: string;
   sources?: Array<{
     title: string;
     url: string;
@@ -34,9 +35,12 @@ interface ChatMessageProps {
 }
 
 const languages = [
+  { name: "English", code: "en" },
   { name: "Hindi", code: "hi" },
   { name: "Marathi", code: "mr" },
   { name: "Sanskrit", code: "sa" },
+  { name: "Urdu", code: "ur" },
+  { name: "Arabic", code: "ar" },
 ];
 
 export const ChatMessage = ({ 
@@ -44,7 +48,8 @@ export const ChatMessage = ({
   isBot = false, 
   isProcessing = false,
   sources,
-  model
+  model,
+  translatedTo
 }: ChatMessageProps) => {
   const [translatedContent, setTranslatedContent] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
@@ -260,19 +265,25 @@ export const ChatMessage = ({
                   variant="outline" 
                   size="sm"
                   disabled={isTranslating}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 hover:bg-secondary/80"
                 >
-                  <Languages className="h-4 w-4" />
+                  <Globe className="h-4 w-4" />
                   {isTranslating ? "Translating..." : "Translate"}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent>
+              <DropdownMenuContent align="start" className="min-w-[150px]">
                 {languages.map((lang) => (
                   <DropdownMenuItem
                     key={lang.code}
                     onClick={() => handleTranslate(lang.code)}
+                    className="flex items-center gap-2 cursor-pointer"
                   >
-                    {lang.name}
+                    <span className="font-medium">{lang.name}</span>
+                    {lang.code === "ur" && <span className="text-xs text-muted-foreground">(اردو)</span>}
+                    {lang.code === "hi" && <span className="text-xs text-muted-foreground">(हिंदी)</span>}
+                    {lang.code === "mr" && <span className="text-xs text-muted-foreground">(मराठी)</span>}
+                    {lang.code === "sa" && <span className="text-xs text-muted-foreground">(संस्कृत)</span>}
+                    {lang.code === "ar" && <span className="text-xs text-muted-foreground">(العربية)</span>}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
@@ -289,6 +300,7 @@ export const ChatMessage = ({
             {model && (
               <span className="text-xs text-muted-foreground ml-auto">
                 Powered by {model}
+                {translatedTo && ` • Translated to ${getLanguageName(translatedTo)}`}
               </span>
             )}
           </div>
@@ -296,4 +308,10 @@ export const ChatMessage = ({
       </div>
     </div>
   );
+};
+
+// Helper function to get the language name from the language code
+const getLanguageName = (langCode: string): string => {
+  const language = languages.find(lang => lang.code === langCode);
+  return language ? language.name : langCode;
 };

@@ -21,18 +21,11 @@ interface ChatInputProps {
 }
 
 const languages = [
+  { name: "English", code: "en" },
   { name: "Hindi", code: "hi" },
   { name: "Marathi", code: "mr" },
   { name: "Sanskrit", code: "sa" },
-  { name: "Spanish", code: "es" },
-  { name: "French", code: "fr" },
-  { name: "German", code: "de" },
-  { name: "Italian", code: "it" },
-  { name: "Portuguese", code: "pt" },
-  { name: "Russian", code: "ru" },
-  { name: "Chinese", code: "zh" },
-  { name: "Japanese", code: "ja" },
-  { name: "Korean", code: "ko" },
+  { name: "Urdu", code: "ur" },
   { name: "Arabic", code: "ar" },
 ];
 
@@ -43,6 +36,7 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [isEditingImage, setIsEditingImage] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
+  const [showTranslatePopup, setShowTranslatePopup] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const MAX_IMAGES = 5;
@@ -108,6 +102,10 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
       setIsGeneratingImage(false);
     }
   };
+
+  const handleTranslate = useCallback(() => {
+    setShowTranslatePopup(true);
+  }, []);
 
   const handleWebSearch = async () => {
     if (!message.trim()) return;
@@ -483,8 +481,14 @@ export default function ${componentName}Component() {
                 <DropdownMenuItem
                   key={lang.code}
                   onClick={() => setSelectedLanguage(lang.code)}
+                  className="flex items-center gap-2"
                 >
-                  {lang.name}
+                  <span className="font-medium">{lang.name}</span>
+                  {lang.code === "ur" && <span className="text-xs text-muted-foreground">(اردو)</span>}
+                  {lang.code === "hi" && <span className="text-xs text-muted-foreground">(हिंदी)</span>}
+                  {lang.code === "mr" && <span className="text-xs text-muted-foreground">(मराठी)</span>}
+                  {lang.code === "sa" && <span className="text-xs text-muted-foreground">(संस्कृत)</span>}
+                  {lang.code === "ar" && <span className="text-xs text-muted-foreground">(العربية)</span>}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -507,11 +511,10 @@ export default function ${componentName}Component() {
         
         <InputActions
           onImageClick={() => fileInputRef.current?.click()}
-          onSearchClick={handleWebSearch}
+          onTranslateClick={handleTranslate}
           onMicClick={isListening ? stopListening : startListening}
           onSendClick={handleSend}
           onGenerateImage={handleGenerateImage}
-          // Remove onGenerateCode since it's not in InputActionsProps
           onWeatherClick={handleWeatherClick} 
           onNavigateClick={handleNavigateClick}
           isListening={isListening}

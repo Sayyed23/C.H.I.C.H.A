@@ -1,10 +1,10 @@
 import React from "react";
 import { Button } from "../ui/button";
-import { Paperclip, Globe, Send, Mic, Wand2, Thermometer, Navigation2 } from "lucide-react";
+import { Paperclip, Languages, Send, Mic, Wand2, Thermometer, Navigation2 } from "lucide-react";
 
 interface InputActionsProps {
   onImageClick: () => void;
-  onSearchClick: () => void;
+  onTranslateClick: () => void;
   onMicClick: () => void;
   onSendClick: () => void;
   onGenerateImage: () => void;
@@ -18,7 +18,7 @@ interface InputActionsProps {
 
 export const InputActions = ({
   onImageClick,
-  onSearchClick,
+  onTranslateClick,
   onMicClick,
   onSendClick,
   onGenerateImage,
@@ -44,12 +44,12 @@ export const InputActions = ({
         <Button
           size="icon"
           variant="ghost"
-          onClick={onSearchClick}
+          onClick={onTranslateClick}
           className="h-9 w-9"
           disabled={isLoading || !hasContent}
-          aria-label="Search web"
+          aria-label="Translate"
         >
-          <Globe className="h-5 w-5 text-muted-foreground" />
+          <Languages className="h-5 w-5 text-muted-foreground" />
         </Button>
         <Button
           size="icon"

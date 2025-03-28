@@ -6,6 +6,7 @@ interface Message {
   isBot: boolean;
   isProcessing?: boolean;
   model?: string;
+  translatedTo?: string;
   sources?: Array<{
     title: string;
     url: string;
@@ -39,6 +40,7 @@ export const ChatContainer = ({ messages }: ChatContainerProps) => {
           isProcessing={message.isProcessing}
           sources={message.sources}
           model={message.model}
+          translatedTo={message.translatedTo}
         />
       ))}
       <div ref={bottomRef} />
