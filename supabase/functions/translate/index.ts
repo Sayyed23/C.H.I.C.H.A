@@ -1,9 +1,10 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai";
 import { corsHeaders } from "../_shared/cors.ts";
 
-// Initialize the Gemini API client 
-const genAI = new GoogleGenerativeAI(Deno.env.get("GEMINI_API_KEY")!);
+// Initialize the Gemini API client with dedicated Translation API key
+const genAI = new GoogleGenerativeAI(Deno.env.get("GEMINI_TRANSLATE_API_KEY")!);
 const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
 serve(async (req) => {
@@ -29,11 +30,14 @@ serve(async (req) => {
       'sa': 'Sanskrit',
       'es': 'Spanish',
       'fr': 'French',
+      'de': 'German',
+      'it': 'Italian',
+      'pt': 'Portuguese',
+      'ru': 'Russian',
+      'zh': 'Chinese',
       'ja': 'Japanese',
       'ko': 'Korean',
       'ar': 'Arabic',
-      'ur': 'Urdu',
-      'en': 'English',
     };
     
     const targetLang = languageMap[targetLanguage] || targetLanguage;
@@ -195,7 +199,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         error: 'Translation service is temporarily unavailable. Please try again later.',
-        details: (lastError as unknown as Error)?.message || String(lastError)
+        details: lastError?.message
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

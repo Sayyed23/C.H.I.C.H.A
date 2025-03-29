@@ -1,23 +1,23 @@
-// For TypeScript support while editing, using Deno URL imports
+
 import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.1.3";
 import { corsHeaders } from "../_shared/cors.ts";
 
-// Initialize Gemini with API key
-const genAI = new GoogleGenerativeAI(Deno.env.get("GEMINI_API_KEY")!);
+// Initialize Gemini with dedicated Chat API key
+const genAI = new GoogleGenerativeAI(Deno.env.get("GEMINI_CHAT_API_KEY")!);
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
 // Simple translation function
-async function translateText(text: string, targetLanguage: string, modelName = "gemini-pro-1.5") {
+async function translateText(text: string, targetLanguage: string) {
   if (!targetLanguage) return { translatedText: text };
 
-  console.log(`Translating to ${targetLanguage} using ${modelName}`);
+  console.log(`Translating to ${targetLanguage}`);
   try {
-    // Use the specified model for translation
-    const translationModel = genAI.getGenerativeModel({ model: modelName });
+    // Try with Gemini first
     const prompt = `Translate the following text to ${targetLanguage}. Respond with only the translated text:
     
     "${text}"`;
     
-    const result = await translationModel.generateContent(prompt);
+    const result = await model.generateContent(prompt);
     const translatedText = result.response.text();
     return { translatedText };
   } catch (error) {
@@ -32,14 +32,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { prompt, imageUrl, voice, targetLanguage, model: requestedModel } = await req.json();
-    
-    // Use the requested model or default to gemini-pro-1.5
-    const modelName = requestedModel || "gemini-pro-1.5";
-    console.log(`Using model: ${modelName}`);
-    
-    // Get the appropriate model
-    const model = genAI.getGenerativeModel({ model: modelName });
+    const { prompt, imageUrl, voice, targetLanguage, isVoiceInput } = await req.json();
     
     // Check if this is a code generation request
     const isCodeRequest = prompt.toLowerCase().includes("generate code") || 
@@ -49,50 +42,13 @@ Deno.serve(async (req) => {
                          prompt.toLowerCase().includes("function") ||
                          prompt.toLowerCase().includes("implementation");
 
-    // Detect language request patterns
-    const promptLower = prompt.toLowerCase();
-    
-    // Check if the user is requesting a specific language
-    const requestedLanguage = promptLower.includes("in urdu") || promptLower.includes("to urdu") || 
-                             promptLower.includes("using urdu") || promptLower.includes("speak urdu") || 
-                             promptLower.includes("in the urdu language") || promptLower.includes("urdu language") || 
-                             promptLower.includes("urdu translation") ? "ur" :
-                              promptLower.includes("in hindi") || promptLower.includes("to hindi") || 
-                              promptLower.includes("using hindi") || promptLower.includes("speak hindi") ||
-                              promptLower.includes("in the hindi language") ? "hi" :
-                              promptLower.includes("in marathi") || promptLower.includes("to marathi") || 
-                              promptLower.includes("using marathi") || promptLower.includes("in the marathi language") ? "mr" :
-                              promptLower.includes("in sanskrit") || promptLower.includes("to sanskrit") || 
-                              promptLower.includes("using sanskrit") || promptLower.includes("in the sanskrit language") ? "sa" :
-                              promptLower.includes("in english") || promptLower.includes("to english") || 
-                              promptLower.includes("using english") || promptLower.includes("speak english") ||
-                              promptLower.includes("in the english language") ? "en" :
-                              promptLower.includes("in arabic") || promptLower.includes("to arabic") || 
-                              promptLower.includes("using arabic") || promptLower.includes("speak arabic") ||
-                              promptLower.includes("in the arabic language") || promptLower.includes("arabic language") ? "ar" :
-                              null;
-    
     // Check if it's a translation request
-    const isTranslationRequest = promptLower.includes("translate") ||
-                                promptLower.includes("translation") ||
-                                promptLower.includes("convert to") ||
-                                promptLower.includes("in hindi") ||
-                                promptLower.includes("in marathi") ||
-                                promptLower.includes("in sanskrit") ||
-                                promptLower.includes("in urdu") ||
-                                promptLower.includes("in english") ||
-                                promptLower.includes("in arabic") ||
-                                promptLower.includes("arabic language") ||
-                                promptLower.includes("respond in urdu") ||
-                                promptLower.includes("answer in urdu") ||
-                                promptLower.includes("reply in urdu") ||
-                                promptLower.includes("speak urdu") ||
-                                promptLower.includes("respond in english") ||
-                                promptLower.includes("answer in english") ||
-                                promptLower.includes("reply in english") ||
-                                promptLower.includes("respond in arabic") ||
-                                promptLower.includes("answer in arabic") ||
-                                promptLower.includes("reply in arabic");
+    const isTranslationRequest = prompt.toLowerCase().includes("translate") ||
+                                prompt.toLowerCase().includes("translation") ||
+                                prompt.toLowerCase().includes("convert to") ||
+                                prompt.toLowerCase().includes("in hindi") ||
+                                prompt.toLowerCase().includes("in marathi") ||
+                                prompt.toLowerCase().includes("in sanskrit");
 
     // Enhance prompt for code generation
     let enhancedPrompt = prompt;
@@ -112,39 +68,34 @@ Deno.serve(async (req) => {
       Text: ${prompt}
       
       If the target language isn't specified, please ask which language to translate to.`;
-    } else if (voice === "assistant") {
+    } else if (voice === "assistant" || isVoiceInput) {
       enhancedPrompt = `As CHICHA, a helpful virtual assistant, please respond in a friendly, conversational tone to the following:
       
       ${prompt}
       
-      Provide concise but comprehensive responses and offer follow-up suggestions when appropriate.`;
+      Provide concise but comprehensive responses that are easy to understand when spoken aloud. Use natural language that flows well in conversation. Keep responses under 3 paragraphs for better voice delivery.`;
     }
 
-    const chat = model.startChat({
-      history: [
-        {
-          role: "user",
-          parts: "You are CHICHA, a helpful AI assistant powered by Gemini. You're knowledgeable about technology, programming, web development, and general knowledge topics. When providing code examples, always format them properly with markdown and include explanations. For translations, preserve the original meaning as much as possible.",
-        },
-        {
-          role: "model",
-          parts: "I understand. I'll help users with their questions and requests across various domains including technology, programming, and general knowledge. I'll provide well-formatted code with clear explanations when needed, and accurate translations that preserve the original meaning. I'll use markdown for proper formatting and ensure my responses are clear, helpful, and conversational.",
-        },
-      ],
+    console.log("Sending request to Gemini API with prompt:", enhancedPrompt);
+    
+    // Generate content with the correct model format
+    const result = await model.generateContent({
+      contents: [{
+        parts: [{ text: enhancedPrompt }]
+      }],
+      generationConfig: {
+        maxOutputTokens: 1000,
+      },
     });
 
-    const result = await chat.sendMessage(enhancedPrompt);
     let response = result.response.text();
-
     console.log("Generated response:", response);
 
-    // Translate the response if targetLanguage is provided or requested in prompt
-    const finalTargetLanguage = targetLanguage || requestedLanguage;
-    
-    if (finalTargetLanguage) {
-      console.log(`Translating response to ${finalTargetLanguage}`);
+    // Translate the response if targetLanguage is provided
+    if (targetLanguage) {
+      console.log(`Translating response to ${targetLanguage}`);
       try {
-        const translationResult = await translateText(response, finalTargetLanguage, modelName);
+        const translationResult = await translateText(response, targetLanguage);
         
         if (translationResult.translatedText) {
           console.log("Translation successful");
@@ -162,8 +113,6 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         response: response,
-        model: modelName,
-        translatedTo: finalTargetLanguage
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

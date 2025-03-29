@@ -1,32 +1,47 @@
+
 import React from "react";
 import { Button } from "../ui/button";
-import { Paperclip, Languages, Send, Mic, Wand2, Thermometer, Navigation2 } from "lucide-react";
+import { Paperclip, Globe, Send, Mic, Wand2, Code, Thermometer, Navigation2, MapPin, CloudSun } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "../ui/dropdown-menu";
 
 interface InputActionsProps {
   onImageClick: () => void;
-  onTranslateClick: () => void;
+  onSearchClick: (engine?: string) => void;
   onMicClick: () => void;
   onSendClick: () => void;
   onGenerateImage: () => void;
+  onGenerateCode: () => void;
   onWeatherClick: () => void;
   onNavigateClick: () => void;
+  onMapClick: () => void;
   isListening: boolean;
   isLoading: boolean;
   isGeneratingImage: boolean;
+  isEditingImage?: boolean;
   hasContent: boolean;
 }
 
 export const InputActions = ({
   onImageClick,
-  onTranslateClick,
+  onSearchClick,
   onMicClick,
   onSendClick,
   onGenerateImage,
+  onGenerateCode,
   onWeatherClick,
   onNavigateClick,
+  onMapClick,
   isListening,
   isLoading,
   isGeneratingImage,
+  isEditingImage,
   hasContent,
 }: InputActionsProps) => {
   return (
@@ -41,16 +56,37 @@ export const InputActions = ({
         >
           <Paperclip className="h-5 w-5 text-muted-foreground" />
         </Button>
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={onTranslateClick}
-          className="h-9 w-9"
-          disabled={isLoading || !hasContent}
-          aria-label="Translate"
-        >
-          <Languages className="h-5 w-5 text-muted-foreground" />
-        </Button>
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-9 w-9"
+              disabled={isLoading || !hasContent}
+              aria-label="Search web"
+            >
+              <Globe className="h-5 w-5 text-muted-foreground" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuLabel>Search Engines</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onSearchClick('firecrawl')}>
+              Firecrawl Search
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSearchClick('google')}>
+              Google Search
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSearchClick('bing')}>
+              Bing Search
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSearchClick('duckduckgo')}>
+              DuckDuckGo Search
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        
         <Button
           size="icon"
           variant="ghost"
@@ -73,11 +109,21 @@ export const InputActions = ({
         <Button
           size="icon"
           variant="ghost"
+          onClick={onGenerateCode}
+          className="h-9 w-9"
+          disabled={isLoading || !hasContent}
+          aria-label="Generate code"
+        >
+          <Code className="h-5 w-5 text-muted-foreground" />
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
           onClick={onWeatherClick}
           className="h-9 w-9"
           aria-label="Check weather"
         >
-          <Thermometer className="h-5 w-5 text-muted-foreground" />
+          <CloudSun className="h-5 w-5 text-muted-foreground" />
         </Button>
         <Button
           size="icon"
@@ -87,6 +133,15 @@ export const InputActions = ({
           aria-label="Get directions"
         >
           <Navigation2 className="h-5 w-5 text-muted-foreground" />
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={onMapClick}
+          className="h-9 w-9"
+          aria-label="Find locations"
+        >
+          <MapPin className="h-5 w-5 text-muted-foreground" />
         </Button>
       </div>
       <Button

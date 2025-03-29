@@ -1,9 +1,9 @@
 import { cn } from "@/lib/utils";
-import { Check, Download, Languages, X, Globe } from "lucide-react";
+import { Check, Download, Languages, X, Volume2 } from "lucide-react";
 import { ProcessingState } from "./ProcessingState";
 import { SearchResults } from "./SearchResults";
 import { Button } from "./ui/button";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   DropdownMenu,
@@ -24,8 +24,6 @@ interface ChatMessageProps {
   content: string;
   isBot?: boolean;
   isProcessing?: boolean;
-  model?: string;
-  translatedTo?: string;
   sources?: Array<{
     title: string;
     url: string;
@@ -35,25 +33,23 @@ interface ChatMessageProps {
 }
 
 const languages = [
-  { name: "English", code: "en" },
   { name: "Hindi", code: "hi" },
   { name: "Marathi", code: "mr" },
   { name: "Sanskrit", code: "sa" },
-  { name: "Urdu", code: "ur" },
-  { name: "Arabic", code: "ar" },
 ];
 
 export const ChatMessage = ({ 
   content, 
   isBot = false, 
   isProcessing = false,
-  sources,
-  model,
-  translatedTo
+  sources
 }: ChatMessageProps) => {
   const [translatedContent, setTranslatedContent] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
   const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const { toast } = useToast();
 
   const processingSteps = [
@@ -67,6 +63,7 @@ export const ChatMessage = ({
   const handleTranslate = async (languageCode: string) => {
     setIsTranslating(true);
     try {
+      console.log('Starting translation for language:', languageCode);
       const { data, error } = await supabase.functions.invoke('translate', {
         body: { 
           text: content,
@@ -74,8 +71,17 @@ export const ChatMessage = ({
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Translation error from Supabase:', error);
+        throw error;
+      }
+
+      console.log('Translation successful:', data);
       setTranslatedContent(data.translatedText);
+      toast({
+        title: "Translation Complete",
+        description: "Text has been translated successfully",
+      });
     } catch (error) {
       console.error('Translation error:', error);
       toast({
@@ -86,6 +92,94 @@ export const ChatMessage = ({
     } finally {
       setIsTranslating(false);
     }
+  };
+
+  const handleSpeakMessage = async () => {
+    // Skip if already playing or not a bot message
+    if (isPlayingAudio || !isBot) return;
+    
+    try {
+      // Use existing audio URL if available
+      if (audioUrl) {
+        audioRef.current?.play();
+        setIsPlayingAudio(true);
+        return;
+      }
+      
+      setIsPlayingAudio(true);
+      
+      const textToSpeak = translatedContent || content;
+      // Get language for TTS if content is translated
+      const language = translatedContent ? 
+        // Extract the language code from the current active translation
+        languages.find(lang => translatedContent)?.code || "en" : 
+        "en";
+      
+      const { data, error } = await supabase.functions.invoke('text-to-speech', {
+        body: { 
+          text: textToSpeak,
+          language: language
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.audioContent) {
+        // Convert base64 to blob URL
+        const audioBlob = base64ToBlob(data.audioContent, 'audio/mp3');
+        const url = URL.createObjectURL(audioBlob);
+        setAudioUrl(url);
+        
+        // Create audio element and play
+        if (!audioRef.current) {
+          audioRef.current = new Audio(url);
+          audioRef.current.onended = () => {
+            setIsPlayingAudio(false);
+          };
+        } else {
+          audioRef.current.src = url;
+        }
+        
+        await audioRef.current.play();
+      }
+    } catch (error) {
+      console.error('Text-to-speech error:', error);
+      toast({
+        title: "Voice Playback Error",
+        description: "Failed to convert text to speech. Please try again.",
+        variant: "destructive",
+      });
+      setIsPlayingAudio(false);
+    }
+  };
+  
+  const stopSpeaking = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      setIsPlayingAudio(false);
+    }
+  };
+
+  const base64ToBlob = (base64: string, mimeType: string) => {
+    const byteCharacters = atob(base64);
+    const byteArrays = [];
+    
+    for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+      const slice = byteCharacters.slice(offset, offset + 512);
+      const byteNumbers = new Array(slice.length);
+      
+      for (let i = 0; i < slice.length; i++) {
+        byteNumbers[i] = slice.charCodeAt(i);
+      }
+      
+      const byteArray = new Uint8Array(byteNumbers);
+      byteArrays.push(byteArray);
+    }
+    
+    return new Blob(byteArrays, { type: mimeType });
   };
 
   const handleDownloadImage = async (imageUrl: string) => {
@@ -115,21 +209,17 @@ export const ChatMessage = ({
     }
   };
 
-  // Function to safely render content with links
   const renderContent = (text: string) => {
-    // Match markdown links [text](url)
     const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
     const parts = [];
     let lastIndex = 0;
     let match;
 
     while ((match = linkRegex.exec(text)) !== null) {
-      // Add text before the link
       if (match.index > lastIndex) {
         parts.push(text.slice(lastIndex, match.index));
       }
 
-      // Add the link
       const [fullMatch, linkText, url] = match;
       parts.push(
         <a
@@ -139,7 +229,6 @@ export const ChatMessage = ({
           rel="noopener noreferrer"
           className="text-blue-500 hover:underline inline-flex items-center gap-1"
           onClick={(e) => {
-            // Optional: Add confirmation for external links
             if (!window.confirm('You are about to visit an external website. Continue?')) {
               e.preventDefault();
             }
@@ -152,7 +241,6 @@ export const ChatMessage = ({
       lastIndex = match.index + fullMatch.length;
     }
 
-    // Add remaining text
     if (lastIndex < text.length) {
       parts.push(text.slice(lastIndex));
     }
@@ -160,12 +248,10 @@ export const ChatMessage = ({
     return parts;
   };
 
-  // Extract image URL if present in the content
   const imageUrlMatch = content.match(/!\[.*?\]\((.*?)\)/);
   const imageUrl = imageUrlMatch ? imageUrlMatch[1] : null;
   const textContent = content.replace(/!\[.*?\]\((.*?)\)/, '').trim();
 
-  // Extract all locations from weather message
   const locationMatches = textContent.match(/Weather in ([^:,]+)(?:,|\:|$)/g);
   const locations = locationMatches 
     ? locationMatches.map(match => match.replace(/Weather in |\:$/g, '').trim())
@@ -240,15 +326,66 @@ export const ChatMessage = ({
           </Dialog>
         )}
         {!imageUrl && (
-          <div
-            className={cn(
-              "rounded-2xl px-4 sm:px-6 py-3 font-medium leading-relaxed tracking-wide",
-              isBot 
-                ? "bg-secondary text-secondary-foreground" 
-                : "bg-primary text-primary-foreground"
+          <div className="flex flex-col gap-2">
+            <div
+              className={cn(
+                "rounded-2xl px-4 sm:px-6 py-3 font-medium leading-relaxed tracking-wide",
+                isBot 
+                  ? "bg-secondary text-secondary-foreground" 
+                  : "bg-primary text-primary-foreground"
+              )}
+            >
+              {renderContent(translatedContent || textContent)}
+            </div>
+            {isBot && (
+              <div className="flex items-center gap-2 mt-1">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="secondary" 
+                      size="sm"
+                      disabled={isTranslating}
+                      className="flex items-center gap-2"
+                    >
+                      <Languages className="h-4 w-4" />
+                      {isTranslating ? "Translating..." : "Translate"}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    {languages.map((lang) => (
+                      <DropdownMenuItem
+                        key={lang.code}
+                        onClick={() => handleTranslate(lang.code)}
+                      >
+                        {lang.name}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={isPlayingAudio ? "bg-primary text-primary-foreground" : ""}
+                  onClick={isPlayingAudio ? stopSpeaking : handleSpeakMessage}
+                  title={isPlayingAudio ? "Stop Speaking" : "Speak Message"}
+                >
+                  <Volume2 className="h-4 w-4 mr-1" />
+                  {isPlayingAudio ? "Stop" : "Listen"}
+                </Button>
+                
+                {translatedContent && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setTranslatedContent(null)}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    Show Original
+                  </Button>
+                )}
+              </div>
             )}
-          >
-            {renderContent(translatedContent || textContent)}
           </div>
         )}
         {locations.length > 0 && isBot && (
@@ -257,61 +394,7 @@ export const ChatMessage = ({
             className="mt-2 w-full max-w-2xl"
           />
         )}
-        {isBot && (
-          <div className="flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  disabled={isTranslating}
-                  className="flex items-center gap-2 hover:bg-secondary/80"
-                >
-                  <Globe className="h-4 w-4" />
-                  {isTranslating ? "Translating..." : "Translate"}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="min-w-[150px]">
-                {languages.map((lang) => (
-                  <DropdownMenuItem
-                    key={lang.code}
-                    onClick={() => handleTranslate(lang.code)}
-                    className="flex items-center gap-2 cursor-pointer"
-                  >
-                    <span className="font-medium">{lang.name}</span>
-                    {lang.code === "ur" && <span className="text-xs text-muted-foreground">(اردو)</span>}
-                    {lang.code === "hi" && <span className="text-xs text-muted-foreground">(हिंदी)</span>}
-                    {lang.code === "mr" && <span className="text-xs text-muted-foreground">(मराठी)</span>}
-                    {lang.code === "sa" && <span className="text-xs text-muted-foreground">(संस्कृत)</span>}
-                    {lang.code === "ar" && <span className="text-xs text-muted-foreground">(العربية)</span>}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            {translatedContent && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setTranslatedContent(null)}
-              >
-                Show Original
-              </Button>
-            )}
-            {model && (
-              <span className="text-xs text-muted-foreground ml-auto">
-                Powered by {model}
-                {translatedTo && ` • Translated to ${getLanguageName(translatedTo)}`}
-              </span>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );
-};
-
-// Helper function to get the language name from the language code
-const getLanguageName = (langCode: string): string => {
-  const language = languages.find(lang => lang.code === langCode);
-  return language ? language.name : langCode;
 };
