@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -11,61 +12,78 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt } = await req.json();
+    const { prompt, imageUrl } = await req.json();
     console.log('Generating image for prompt:', prompt);
-
-    const runwareApiKey = Deno.env.get('RUNWARE_API_KEY');
-    if (!runwareApiKey) {
-      console.error('RUNWARE_API_KEY is not set in environment variables');
-      throw new Error('RUNWARE_API_KEY is not set');
+    
+    const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openAiApiKey) {
+      console.error('OPENAI_API_KEY is not set in environment variables');
+      throw new Error('OPENAI_API_KEY is not set');
     }
 
-    console.log('Making request to Runware API...');
-    const response = await fetch('https://api.runware.ai/v1', {
+    // Enhance the prompt for better results
+    const enhancedPrompt = imageUrl 
+      ? `Transform this image based on the following instruction: ${prompt}` 
+      : prompt;
+
+    // Create the appropriate request body based on whether we have an image
+    let requestBody;
+    
+    if (imageUrl) {
+      // First, we need to fetch the image data
+      const imageResponse = await fetch(imageUrl);
+      if (!imageResponse.ok) {
+        throw new Error(`Failed to fetch image from ${imageUrl}`);
+      }
+      
+      // Convert image to base64 string if needed
+      const imageBlob = await imageResponse.blob();
+      
+      // For image variation/edit
+      requestBody = {
+        model: "dall-e-3",
+        prompt: enhancedPrompt,
+        n: 1,
+        size: "1024x1024",
+        quality: "standard",
+        image: imageUrl
+      };
+    } else {
+      // For text-to-image generation
+      requestBody = {
+        model: "dall-e-3",
+        prompt: enhancedPrompt,
+        n: 1,
+        size: "1024x1024",
+        quality: "standard"
+      };
+    }
+
+    console.log('Making request to OpenAI API...');
+    const response = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${openAiApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify([
-        {
-          taskType: "authentication",
-          apiKey: runwareApiKey
-        },
-        {
-          taskType: "imageInference",
-          taskUUID: crypto.randomUUID(),
-          positivePrompt: prompt,
-          width: 1024,
-          height: 1024,
-          model: "runware:100@1",
-          numberResults: 1,
-          outputFormat: "WEBP",
-          CFGScale: 1,
-          scheduler: "FlowMatchEulerDiscreteScheduler",
-          strength: 0.8
-        }
-      ])
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
       const error = await response.json();
-      console.error('Runware API error response:', error);
-      throw new Error(`Runware API error: ${JSON.stringify(error)}`);
+      console.error('OpenAI API error response:', error);
+      throw new Error(`OpenAI API error: ${JSON.stringify(error)}`);
     }
 
     const data = await response.json();
-    console.log('Runware API response:', data);
-
-    // Find the image inference response in the data array
-    const imageData = data.data?.find(item => item.taskType === "imageInference");
+    console.log('OpenAI API response received');
     
-    if (!imageData || !imageData.imageURL) {
-      console.error('No image URL in response data:', data);
-      throw new Error('No image URL in image inference response');
+    if (!data.data || data.data.length === 0 || !data.data[0].url) {
+      throw new Error('No image URL in response data');
     }
 
     return new Response(
-      JSON.stringify({ imageUrl: imageData.imageURL }),
+      JSON.stringify({ imageUrl: data.data[0].url }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
