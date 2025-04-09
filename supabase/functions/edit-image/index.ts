@@ -1,116 +1,115 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { corsHeaders } from "../_shared/cors.ts";
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { prompt, imageUrl } = await req.json()
-    console.log('Editing image with prompt:', prompt)
-    console.log('Source image URL:', imageUrl)
+    const { prompt, imageUrl } = await req.json();
+    console.log('Editing image with prompt:', prompt);
+    console.log('Source image URL:', imageUrl);
 
     if (!prompt || !imageUrl) {
-      throw new Error('Missing required parameters: prompt and imageUrl')
+      throw new Error('Missing required parameters: prompt and imageUrl');
     }
 
-    const runwareApiKey = Deno.env.get('RUNWARE_API_KEY')
-    if (!runwareApiKey) {
-      throw new Error('RUNWARE_API_KEY is not set')
+    const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openAiApiKey) {
+      throw new Error('OPENAI_API_KEY is not set');
     }
-
-    // Download the image and convert it to base64
-    const imageResponse = await fetch(imageUrl)
-    if (!imageResponse.ok) {
-      throw new Error(`Failed to fetch image: ${imageResponse.statusText}`)
-    }
-
-    const imageBlob = await imageResponse.blob()
-    const imageBuffer = await imageBlob.arrayBuffer()
-    const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)))
 
     // Enhance the prompt for better image editing results
-    const enhancedPrompt = `Edit this image according to the following instructions: ${prompt}. Keep the main subject and composition intact while applying the requested changes.`
+    const enhancedPrompt = `Edit this image according to these instructions: ${prompt}. Maintain the overall style and composition where appropriate.`;
 
-    console.log('Making request to Runware API with enhanced prompt:', enhancedPrompt)
-    
-    const requestBody = JSON.stringify([
-      {
-        taskType: "authentication",
-        apiKey: runwareApiKey
-      },
-      {
-        taskType: "imageInference",
-        taskUUID: crypto.randomUUID(),
-        positivePrompt: enhancedPrompt,
-        width: 1024,
-        height: 1024,
-        model: "runware:100@1",
-        numberResults: 1,
-        outputFormat: "WEBP",
-        CFGScale: 7.5,
-        scheduler: "FlowMatchEulerDiscreteScheduler",
-        strength: 0.75,
-        initImage: `data:image/jpeg;base64,${base64Image}`
-      }
-    ])
-
-    console.log('Sending request to Runware API...')
-    const runwareResponse = await fetch('https://api.runware.ai/v1', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: requestBody
-    })
-
-    if (!runwareResponse.ok) {
-      const errorData = await runwareResponse.json()
-      console.error('Runware API error response:', errorData)
-      throw new Error(`Runware API error: ${JSON.stringify(errorData)}`)
+    // Download the image
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to fetch image: ${imageResponse.statusText}`);
     }
 
-    const data = await runwareResponse.json()
-    console.log('Runware API response:', data)
-
-    const imageData = data.data?.find((item: any) => item.taskType === "imageInference")
+    const imageBlob = await imageResponse.blob();
     
-    if (!imageData?.imageURL) {
-      throw new Error('No image URL in response')
+    // Create form data for the multipart request
+    const formData = new FormData();
+    formData.append('image', imageBlob);
+    formData.append('prompt', enhancedPrompt);
+    formData.append('n', '1');
+    formData.append('size', '1024x1024');
+    formData.append('model', 'dall-e-3');
+
+    console.log('Making request to OpenAI API for image editing...');
+    
+    // Use the image variations endpoint instead of edits
+    const response = await fetch('https://api.openai.com/v1/images/variations', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAiApiKey}`,
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenAI API error response:', errorText);
+      
+      // Try the fallback to the generations endpoint if variations fails
+      console.log('Trying fallback to generations endpoint...');
+      const fallbackResponse = await fetch('https://api.openai.com/v1/images/generations', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: "dall-e-3",
+          prompt: `${enhancedPrompt} The original image shows: [Describe the image in detail that would be useful context]`,
+          n: 1,
+          size: "1024x1024",
+        })
+      });
+      
+      if (!fallbackResponse.ok) {
+        const fallbackError = await fallbackResponse.text();
+        throw new Error(`OpenAI API error: ${fallbackError}`);
+      }
+      
+      const fallbackData = await fallbackResponse.json();
+      
+      return new Response(
+        JSON.stringify({ 
+          imageUrl: fallbackData.data[0].url,
+          usedFallback: true 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const data = await response.json();
+    console.log('OpenAI API response received');
+    
+    if (!data.data || data.data.length === 0 || !data.data[0].url) {
+      throw new Error('No image URL in response');
     }
 
     return new Response(
-      JSON.stringify({ 
-        imageUrl: imageData.imageURL,
-        prompt: enhancedPrompt 
-      }),
-      { 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        } 
-      }
-    )
+      JSON.stringify({ imageUrl: data.data[0].url }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   } catch (error) {
-    console.error('Error in edit-image function:', error)
+    console.error('Error in edit-image function:', error);
     return new Response(
       JSON.stringify({ 
         error: error.message,
         type: 'generation_error'
       }),
       { 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500
       }
-    )
+    );
   }
-})
+});

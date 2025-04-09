@@ -1,13 +1,11 @@
 
 import { useState, useEffect } from "react";
-import { useToast } from "@/hooks/use-toast";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { supabase } from "@/integrations/supabase/client";
 
 export const useVoiceInput = (setMessage: React.Dispatch<React.SetStateAction<string>>) => {
   const [isVoiceInputActive, setIsVoiceInputActive] = useState(false);
-  const { toast } = useToast();
   
   const { 
     isRecording,
@@ -36,13 +34,9 @@ export const useVoiceInput = (setMessage: React.Dispatch<React.SetStateAction<st
 
   useEffect(() => {
     if (isError) {
-      toast({
-        title: "Speech Recognition Error",
-        description: errorMessage || "An error occurred with speech recognition",
-        variant: "destructive",
-      });
+      console.error('Speech recognition error:', errorMessage);
     }
-  }, [isError, errorMessage, toast]);
+  }, [isError, errorMessage]);
 
   useEffect(() => {
     if (audioBlob) {
@@ -57,10 +51,7 @@ export const useVoiceInput = (setMessage: React.Dispatch<React.SetStateAction<st
       const base64Audio = await getBase64Audio();
       if (!base64Audio) return;
 
-      toast({
-        title: "Processing Audio",
-        description: "Converting your speech to text...",
-      });
+      console.log('Processing audio for transcription...');
 
       const { data, error } = await supabase.functions.invoke('speech-to-text', {
         body: { 
@@ -73,23 +64,12 @@ export const useVoiceInput = (setMessage: React.Dispatch<React.SetStateAction<st
 
       if (data?.text) {
         setMessage(prev => prev + (prev ? ' ' : '') + data.text);
-        toast({
-          title: "Speech Detected",
-          description: `"${data.text}"`,
-        });
+        console.log('Speech detected:', data.text);
       } else {
-        toast({
-          title: "No Speech Detected",
-          description: "Could not detect any speech in the recording.",
-        });
+        console.log('No speech detected in the recording.');
       }
     } catch (error) {
       console.error('Voice transcription error:', error);
-      toast({
-        title: "Transcription Error",
-        description: "Failed to convert your speech to text. Please try again.",
-        variant: "destructive",
-      });
     } finally {
       setIsVoiceInputActive(false);
     }

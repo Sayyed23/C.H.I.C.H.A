@@ -1,14 +1,14 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { type useToast } from "@/hooks/use-toast";
+import { type Toast } from "@/hooks/use-toast";
+import { toast } from "@/hooks/use-toast";
 
 export interface MessageProcessorOptions {
   onSend: (message: string, options?: { targetLanguage?: string }) => void;
-  toast: ReturnType<typeof useToast>;
 }
 
 export const MessageProcessor = (options: MessageProcessorOptions) => {
-  const { onSend, toast } = options;
+  const { onSend } = options;
 
   const processMessage = async (
     message: string, 
@@ -50,7 +50,7 @@ export const MessageProcessor = (options: MessageProcessorOptions) => {
         }
       } catch (error) {
         console.error('Weather fetch error:', error);
-        toast.toast({
+        toast({
           title: "Weather Error",
           description: "Failed to fetch weather information. Please try again.",
           variant: "destructive",
@@ -94,7 +94,7 @@ export const MessageProcessor = (options: MessageProcessorOptions) => {
         }
       } catch (error) {
         console.error('Distance calculation error:', error);
-        toast.toast({
+        toast({
           title: "Error",
           description: "Failed to calculate distance. Please try again.",
           variant: "destructive",
@@ -138,11 +138,70 @@ export const MessageProcessor = (options: MessageProcessorOptions) => {
         }
       } catch (error) {
         console.error('Location search error:', error);
-        toast.toast({
+        toast({
           title: "Error",
           description: "Failed to search for locations. Please try again.",
           variant: "destructive",
         });
+      }
+      
+      return true;
+    }
+    
+    // Check for image generation request
+    const imageGenMatch = message.match(/(?:generate|create|make)\s+(?:a\s+)?(?:picture|image|photo|drawing|illustration)\s+(?:of|with|showing|featuring)?\s+(.+)/i);
+    if (imageGenMatch) {
+      const imagePrompt = imageGenMatch[1].trim();
+      
+      if (!imagePrompt) {
+        onSend("Please provide more details about what you'd like in your image. For example: 'Generate an image of a sunset over mountains'");
+        return true;
+      }
+      
+      try {
+        onSend(`🎨 Creating an image of: "${imagePrompt}"... This might take a minute.`);
+        
+        // Check if there's an uploaded image to use as a base
+        const sourceImageUrl = imageUrls.length > 0 ? imageUrls[0] : null;
+        
+        if (sourceImageUrl) {
+          // Use the dedicated edit-image function for image editing
+          const { data, error } = await supabase.functions.invoke('edit-image', {
+            body: { 
+              prompt: imagePrompt,
+              imageUrl: sourceImageUrl
+            }
+          });
+
+          if (error) throw error;
+          
+          if (data && data.imageUrl) {
+            onSend(`✨ Here's your transformed image based on "${imagePrompt}":\n\n![Edited Image](${data.imageUrl})`);
+          } else {
+            throw new Error("Failed to edit image");
+          }
+        } else {
+          // Use the regular generate-image function for text-to-image
+          const { data, error } = await supabase.functions.invoke('generate-image', {
+            body: { prompt: imagePrompt }
+          });
+
+          if (error) throw error;
+          
+          if (data && data.imageUrl) {
+            onSend(`✨ Here's your generated image of "${imagePrompt}":\n\n![Generated Image](${data.imageUrl})`);
+          } else {
+            throw new Error("Failed to generate image");
+          }
+        }
+      } catch (error) {
+        console.error('Image generation error:', error);
+        toast({
+          title: "Image Generation Error",
+          description: "Failed to generate image. Please try again.",
+          variant: "destructive",
+        });
+        onSend("Sorry, I encountered an error while generating your image. Please try again later.");
       }
       
       return true;

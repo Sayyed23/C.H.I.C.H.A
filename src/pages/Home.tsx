@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bot, Sparkles, FileSearch, Book, MessageSquare } from "lucide-react";
+import { Bot, Sparkles, FileSearch, Book, MessageSquare, Image } from "lucide-react";
 
 const Home = () => {
   const navigate = useNavigate();
@@ -16,6 +16,13 @@ const Home = () => {
       name: "CHICHA (Gemini)",
       description: "Your AI Virtual Assistant with Web Search Powered by Google Gemini",
       icon: <Sparkles className="h-8 w-8 text-purple-500" />,
+      category: "ai",
+    },
+    {
+      id: "memory",
+      name: "Childhood Memory Generator",
+      description: "Transform your childhood memories into beautiful images using AI",
+      icon: <Image className="h-8 w-8 text-pink-500" />,
       category: "ai",
     },
     {
@@ -48,6 +55,8 @@ const Home = () => {
   const handleSelectChatbot = (id: string) => {
     if (id === "gemini") {
       navigate("/chat");
+    } else if (id === "memory") {
+      navigate("/childhood-memory");
     } else {
       // For future implementation of other chatbots
       navigate("/chat");

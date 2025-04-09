@@ -1,7 +1,7 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { ChatContainer } from "@/components/ChatContainer";
 import { ChatInput } from "@/components/ChatInput";
-import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { LogOut, Plus, Trash2, ChevronLeft, ChevronRight, Home, Globe } from "lucide-react";
@@ -40,7 +40,6 @@ const Index = () => {
     return window.innerWidth >= 768; // Default visible on desktop, hidden on mobile
   });
   const [isMobileView, setIsMobileView] = useState(window.innerWidth < 768);
-  const { toast } = useToast();
   const { transcript, isListening, startListening, stopListening } = useSpeechRecognition();
 
   useEffect(() => {
@@ -94,11 +93,6 @@ const Index = () => {
       return data;
     } catch (error) {
       console.error('Error fetching chat history:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch chat history",
-        variant: "destructive",
-      });
       return [];
     }
   };
@@ -119,11 +113,6 @@ const Index = () => {
       fetchChatHistory(); // Refresh chat history
     } catch (error) {
       console.error('Error creating new chat:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create new chat",
-        variant: "destructive",
-      });
     }
   };
 
@@ -141,18 +130,8 @@ const Index = () => {
       if (chatId === currentChatId) {
         handleNewChat();
       }
-
-      toast({
-        title: "Success",
-        description: "Chat deleted successfully",
-      });
     } catch (error) {
       console.error('Error deleting chat:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete chat",
-        variant: "destructive",
-      });
     }
   };
 
@@ -205,11 +184,6 @@ const Index = () => {
       setCurrentChatId(chatId);
     } catch (error) {
       console.error('Error loading chat:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load chat history",
-        variant: "destructive",
-      });
     }
   };
 
@@ -258,11 +232,7 @@ const Index = () => {
         imageUrl = await handleImageUpload(selectedImage);
         setSelectedImage(null);
       } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to upload image",
-          variant: "destructive",
-        });
+        console.error('Failed to upload image:', error);
         return;
       }
     }
@@ -323,16 +293,6 @@ const Index = () => {
     } catch (error) {
       console.error('Error calling Gemini:', error);
       
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : 'Unknown error occurred';
-      
-      toast({
-        title: "AI Response Error",
-        description: `Failed to get response from AI. ${errorMessage}`,
-        variant: "destructive",
-      });
-      
       setMessages((prev) => {
         if (prev.length > 0 && prev[prev.length - 1].isBot && prev[prev.length - 1].isProcessing) {
           return prev.slice(0, -1);
@@ -368,11 +328,6 @@ const Index = () => {
       if (error) throw error;
     } catch (error) {
       console.error('Error signing out:', error);
-      toast({
-        title: "Error",
-        description: "Failed to sign out",
-        variant: "destructive",
-      });
     }
   };
 

@@ -14,6 +14,7 @@ serve(async (req) => {
   try {
     const { prompt, imageUrl } = await req.json();
     console.log('Generating image for prompt:', prompt);
+    console.log('Image URL (if any):', imageUrl);
     
     const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAiApiKey) {
@@ -26,30 +27,56 @@ serve(async (req) => {
       ? `Transform this image based on the following instruction: ${prompt}` 
       : prompt;
 
-    // Create the appropriate request body based on whether we have an image
+    // Create the request body based on whether we have an image
     let requestBody;
     
     if (imageUrl) {
-      // First, we need to fetch the image data
+      console.log('Using image-to-image generation mode');
+      
+      // For DALL-E 3, we can't send base64 encoded images directly
+      // We need to first upload the image to get a reference
       const imageResponse = await fetch(imageUrl);
       if (!imageResponse.ok) {
-        throw new Error(`Failed to fetch image from ${imageUrl}`);
+        throw new Error(`Failed to fetch image from ${imageUrl}: ${imageResponse.statusText}`);
       }
       
-      // Convert image to base64 string if needed
       const imageBlob = await imageResponse.blob();
       
-      // For image variation/edit
+      // Convert blob to form data for the image upload
+      const formData = new FormData();
+      formData.append('image', imageBlob, 'image.png');
+      
+      // Upload the image to OpenAI
+      console.log('Uploading image to OpenAI...');
+      const uploadResponse = await fetch('https://api.openai.com/v1/images/edits', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAiApiKey}`,
+        },
+        body: formData
+      });
+      
+      if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        console.error('Image upload error:', errorText);
+        throw new Error(`Failed to upload image: ${errorText}`);
+      }
+      
+      const uploadData = await uploadResponse.json();
+      console.log('Image uploaded successfully:', uploadData);
+      
+      // For text-to-image generation with the uploaded image as reference
       requestBody = {
         model: "dall-e-3",
         prompt: enhancedPrompt,
         n: 1,
         size: "1024x1024",
         quality: "standard",
-        image: imageUrl
+        image: uploadData.id || uploadData.url
       };
     } else {
-      // For text-to-image generation
+      // For regular text-to-image generation
+      console.log('Using text-to-image generation mode');
       requestBody = {
         model: "dall-e-3",
         prompt: enhancedPrompt,
@@ -59,8 +86,10 @@ serve(async (req) => {
       };
     }
 
-    console.log('Making request to OpenAI API...');
-    const response = await fetch('https://api.openai.com/v1/images/generations', {
+    console.log('Making request to OpenAI API with body:', JSON.stringify(requestBody));
+    const endpoint = imageUrl ? 'https://api.openai.com/v1/images/edits' : 'https://api.openai.com/v1/images/generations';
+    
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openAiApiKey}`,
@@ -76,9 +105,10 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log('OpenAI API response received');
+    console.log('OpenAI API response received successfully');
     
     if (!data.data || data.data.length === 0 || !data.data[0].url) {
+      console.error('No image URL in response data:', data);
       throw new Error('No image URL in response data');
     }
 
