@@ -138,7 +138,7 @@ export const InputActions = ({
         <Button
           size="icon"
           variant="ghost"
-          onClick={onNavigateClick}
+          onClick={onNavigateClick}   
           className="h-9 w-9"
           aria-label="Get directions"
         >
