@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -110,7 +109,7 @@ const Home = () => {
                     variant={bot.id === "gemini" ? "default" : "outline"}
                   >
                     <Bot className="mr-2 h-4 w-4" />
-                    {bot.id === "gemini" ? "Start Chatting" : "Coming Soon"}
+                    {bot.id === "gemini" ? "Start Chatting" : bot.id === "memory" ? "Generate" : "Coming Soon"}
                   </Button>
                 </CardFooter>
               </Card>
@@ -138,7 +137,7 @@ const Home = () => {
                     variant={bot.id === "gemini" ? "default" : "outline"}
                   >
                     <Bot className="mr-2 h-4 w-4" />
-                    {bot.id === "gemini" ? "Start Chatting" : "Coming Soon"}
+                    {bot.id === "gemini" ? "Start Chatting" : bot.id === "memory" ? "Generate" : "Coming Soon"}
                   </Button>
                 </CardFooter>
               </Card>
@@ -166,7 +165,7 @@ const Home = () => {
                     variant={bot.id === "gemini" ? "default" : "outline"}
                   >
                     <Bot className="mr-2 h-4 w-4" />
-                    {bot.id === "gemini" ? "Start Chatting" : "Coming Soon"}
+                    {bot.id === "gemini" ? "Start Chatting" : bot.id === "memory" ? "Generate" : "Coming Soon"}
                   </Button>
                 </CardFooter>
               </Card>
@@ -194,7 +193,7 @@ const Home = () => {
                     variant={bot.id === "gemini" ? "default" : "outline"}
                   >
                     <Bot className="mr-2 h-4 w-4" />
-                    {bot.id === "gemini" ? "Start Chatting" : "Coming Soon"}
+                    {bot.id === "gemini" ? "Start Chatting" : bot.id === "memory" ? "Generate" : "Coming Soon"}
                   </Button>
                 </CardFooter>
               </Card>

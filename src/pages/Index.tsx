@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { ChatContainer } from "@/components/ChatContainer";
 import { ChatInput } from "@/components/ChatInput";
@@ -354,7 +353,7 @@ const Index = () => {
           ${isSidebarVisible ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
-        <div className="w-full h-full border-r border-border bg-card p-2 md:p-4 flex flex-col">
+        <div className="w-full h-full border-r border-border bg-card p-2 md:p-4 flex flex-col min-h-0">
           {/* Close button - only on mobile */}
           {isMobileView && (
             <Button 
@@ -366,8 +365,7 @@ const Index = () => {
               <ChevronLeft className="h-4 w-4" />
             </Button>
           )}
-          
-          <div className="space-y-4">
+          <div className="space-y-4 flex-1 min-h-0 overflow-y-auto">
             <Button 
               variant="outline" 
               onClick={() => navigate("/home")} 
@@ -409,7 +407,7 @@ const Index = () => {
           <Button 
             variant="outline" 
             onClick={handleLogout} 
-            className="mt-auto mb-4"
+            className="mt-4 mb-4"
           >
             <LogOut className="mr-2 h-4 w-4" />
             Logout
@@ -429,7 +427,7 @@ const Index = () => {
 
       {/* Main content area */}
       <div 
-        className="flex-1 flex flex-col h-full w-full overflow-hidden transition-all duration-300 ease-in-out"
+        className="flex-1 flex flex-col h-full w-full min-h-0 overflow-hidden transition-all duration-300 ease-in-out"
         style={{
           marginLeft: isMobileView ? 0 : (isSidebarVisible ? '0' : '0'),
         }}
@@ -448,7 +446,6 @@ const Index = () => {
               </Button>
             )}
           </div>
-          
           <div className="flex items-center justify-center gap-2">
             <img 
               src="/lovable-uploads/8af0d91e-2677-445f-9de9-657b8af84348.png" 
@@ -459,7 +456,6 @@ const Index = () => {
               CHICHA
             </h1>
           </div>
-          
           <div className="flex-1 flex justify-end">
             <Button 
               variant="outline" 
@@ -472,16 +468,13 @@ const Index = () => {
             </Button>
           </div>
         </div>
-
         <p className="text-xs md:text-sm text-muted-foreground text-center mb-2 md:mb-4">
           Your AI Assistant with Web Search and Translation (English, Hindi, Marathi, Sanskrit, Urdu, Arabic)
         </p>
-
         {/* Chat container */}
-        <div className="flex-1 overflow-hidden rounded-lg border bg-card shadow-sm">
+        <div className="flex-1 min-h-0 overflow-y-auto rounded-lg border bg-card shadow-sm">
           <ChatContainer messages={messages} />
         </div>
-
         {/* Input section */}
         <div className="mt-2 md:mt-4">
           <ChatInput 
@@ -490,7 +483,6 @@ const Index = () => {
             onImageSelect={setSelectedImage}
           />
         </div>
-
         {/* Selected image indicator */}
         {selectedImage && (
           <div className="mt-2 flex items-center gap-2 text-xs md:text-sm">
@@ -507,7 +499,6 @@ const Index = () => {
           </div>
         )}
       </div>
-
       <Toaster />
     </div>
   );
