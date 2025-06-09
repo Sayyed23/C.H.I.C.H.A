@@ -1,10 +1,9 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { ChatContainer } from "@/components/ChatContainer";
 import { ChatInput } from "@/components/ChatInput";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { LogOut, Plus, Trash2, Settings, Home } from "lucide-react";
+import { LogOut, Plus, Trash2, Settings, Home, Menu } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { useNavigate } from "react-router-dom";
@@ -36,9 +35,7 @@ const Index = () => {
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [isSidebarVisible, setIsSidebarVisible] = useState(() => {
-    return window.innerWidth >= 768;
-  });
+  const [isSidebarVisible, setIsSidebarVisible] = useState(false);
   const [isMobileView, setIsMobileView] = useState(window.innerWidth < 768);
   const { transcript, isListening, startListening, stopListening } = useSpeechRecognition();
 
@@ -72,14 +69,11 @@ const Index = () => {
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
       setIsMobileView(mobile);
-      if (!mobile && !isSidebarVisible) {
-        setIsSidebarVisible(true);
-      }
     };
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [isSidebarVisible]);
+  }, []);
 
   const fetchChatHistory = async () => {
     try {
@@ -338,6 +332,10 @@ const Index = () => {
     });
   };
 
+  const toggleSidebar = () => {
+    setIsSidebarVisible(!isSidebarVisible);
+  };
+
   return (
     <div className="w-full h-screen flex bg-gray-50 overflow-hidden">
       {/* Backdrop overlay for mobile */}
@@ -349,96 +347,97 @@ const Index = () => {
       )}
 
       {/* Sidebar */}
-      <aside 
-        className={`
-          ${isMobileView ? 'fixed' : 'relative'} 
-          z-40 h-full w-[300px] bg-white border-r border-gray-200 flex-shrink-0
-          transition-all duration-300 ease-in-out
-          ${isSidebarVisible ? 'translate-x-0' : '-translate-x-full'}
-        `}
-      >
-        <div className="w-full h-full flex flex-col">
-          {/* Header */}
-          <div className="p-4 border-b border-gray-200 flex-shrink-0">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 bg-teal-500 rounded-lg flex items-center justify-center">
-                <span className="text-white text-sm font-bold">💬</span>
-              </div>
-              <h1 className="text-xl font-bold text-gray-900">CHICHA</h1>
-            </div>
-            <div className="text-xs text-gray-500 mb-2">CHICHA AI Logo</div>
-          </div>
-
-          {/* New Chat Button */}
-          <div className="p-4 flex-shrink-0">
-            <Button 
-              onClick={handleNewChat} 
-              className="w-full bg-teal-500 hover:bg-teal-600 text-white rounded-lg py-3 flex items-center justify-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              New Chat
-            </Button>
-          </div>
-
-          {/* Chat History */}
-          <div className="flex-1 overflow-y-auto px-4 min-h-0">
-            {chatHistory.map((chat) => (
-              <div 
-                key={chat.id} 
-                className={`
-                  flex items-center justify-between p-3 mb-2 rounded-lg cursor-pointer
-                  ${currentChatId === chat.id ? 'bg-teal-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}
-                `}
-                onClick={() => loadChat(chat.id)}
-              >
-                <div className="flex-1">
-                  <div className="text-sm font-medium">
-                    Chat - {formatChatTime(chat.created_at)}
-                  </div>
+      {isSidebarVisible && (
+        <aside 
+          className={`
+            ${isMobileView ? 'fixed' : 'relative'} 
+            z-40 h-full w-[300px] bg-white border-r border-gray-200 flex-shrink-0
+            transition-all duration-300 ease-in-out
+          `}
+        >
+          <div className="w-full h-full flex flex-col">
+            {/* Header */}
+            <div className="p-4 border-b border-gray-200 flex-shrink-0">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 bg-teal-500 rounded-lg flex items-center justify-center">
+                  <span className="text-white text-sm font-bold">💬</span>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteChat(chat.id);
-                  }}
-                  className={`h-6 w-6 ${currentChatId === chat.id ? 'text-white hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
+                <h1 className="text-xl font-bold text-gray-900">CHICHA</h1>
               </div>
-            ))}
-          </div>
+              <div className="text-xs text-gray-500 mb-2">CHICHA AI Logo</div>
+            </div>
 
-          {/* Footer */}
-          <div className="p-4 border-t border-gray-200 space-y-2 flex-shrink-0">
-            <Button 
-              variant="ghost" 
-              onClick={() => navigate("/home")} 
-              className="w-full justify-start text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-            >
-              <Home className="h-4 w-4 mr-2" />
-              Back to Home
-            </Button>
-            <Button 
-              variant="ghost" 
-              className="w-full justify-start text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-            >
-              <Settings className="h-4 w-4 mr-2" />
-              Settings
-            </Button>
-            <Button 
-              variant="ghost" 
-              onClick={handleLogout} 
-              className="w-full justify-start text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
+            {/* New Chat Button */}
+            <div className="p-4 flex-shrink-0">
+              <Button 
+                onClick={handleNewChat} 
+                className="w-full bg-teal-500 hover:bg-teal-600 text-white rounded-lg py-3 flex items-center justify-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                New Chat
+              </Button>
+            </div>
+
+            {/* Chat History */}
+            <div className="flex-1 overflow-y-auto px-4 min-h-0">
+              {chatHistory.map((chat) => (
+                <div 
+                  key={chat.id} 
+                  className={`
+                    flex items-center justify-between p-3 mb-2 rounded-lg cursor-pointer
+                    ${currentChatId === chat.id ? 'bg-teal-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}
+                  `}
+                  onClick={() => loadChat(chat.id)}
+                >
+                  <div className="flex-1">
+                    <div className="text-sm font-medium">
+                      Chat - {formatChatTime(chat.created_at)}
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteChat(chat.id);
+                    }}
+                    className={`h-6 w-6 ${currentChatId === chat.id ? 'text-white hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-gray-200 space-y-2 flex-shrink-0">
+              <Button 
+                variant="ghost" 
+                onClick={() => navigate("/home")} 
+                className="w-full justify-start text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+              >
+                <Home className="h-4 w-4 mr-2" />
+                Back to Home
+              </Button>
+              <Button 
+                variant="ghost" 
+                className="w-full justify-start text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Settings
+              </Button>
+              <Button 
+                variant="ghost" 
+                onClick={handleLogout} 
+                className="w-full justify-start text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
+            </div>
           </div>
-        </div>
-      </aside>
+        </aside>
+      )}
 
       {/* Main content area */}
       <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
@@ -446,15 +445,14 @@ const Index = () => {
         <div className="bg-white border-b border-gray-200 px-6 py-4 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {!isSidebarVisible && (
-                <Button 
-                  variant="ghost" 
-                  onClick={() => setIsSidebarVisible(true)}
-                  size="sm"
-                >
-                  ☰
-                </Button>
-              )}
+              <Button 
+                variant="ghost" 
+                onClick={toggleSidebar}
+                size="sm"
+                className="p-2"
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
               <div className="w-8 h-8 bg-teal-500 rounded-lg flex items-center justify-center">
                 <span className="text-white text-sm font-bold">💬</span>
               </div>
@@ -468,15 +466,6 @@ const Index = () => {
                 </h2>
               </div>
             </div>
-            {isSidebarVisible && !isMobileView && (
-              <Button 
-                variant="ghost" 
-                onClick={() => setIsSidebarVisible(false)}
-                size="sm"
-              >
-                ←
-              </Button>
-            )}
           </div>
         </div>
 
