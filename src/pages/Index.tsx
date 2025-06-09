@@ -3,7 +3,7 @@ import { ChatContainer } from "@/components/ChatContainer";
 import { ChatInput } from "@/components/ChatInput";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { LogOut, Plus, Trash2, ChevronLeft, ChevronRight, Home, Globe } from "lucide-react";
+import { LogOut, Plus, Trash2, Settings, Home } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { useNavigate } from "react-router-dom";
@@ -36,7 +36,7 @@ const Index = () => {
   const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [isSidebarVisible, setIsSidebarVisible] = useState(() => {
-    return window.innerWidth >= 768; // Default visible on desktop, hidden on mobile
+    return window.innerWidth >= 768;
   });
   const [isMobileView, setIsMobileView] = useState(window.innerWidth < 768);
   const { transcript, isListening, startListening, stopListening } = useSpeechRecognition();
@@ -48,7 +48,7 @@ const Index = () => {
         await createNewChat();
         setMessages([
           {
-            content: "Hi! I'm CHICHA, your friendly AI assistant. I can search the web to help answer your questions and translate content into multiple languages including English, Hindi, Marathi, Sanskrit, Urdu (اردو), and Arabic (العربية). How can I help you today?",
+            content: "Welcome to CHICHA AI! How can I help you today? I can chat, answer questions about images you upload, or search the web if you type '/search your query'.",
             isBot: true,
           },
         ]);
@@ -109,7 +109,7 @@ const Index = () => {
 
       if (error) throw error;
       setCurrentChatId(data.id);
-      fetchChatHistory(); // Refresh chat history
+      fetchChatHistory();
     } catch (error) {
       console.error('Error creating new chat:', error);
     }
@@ -174,7 +174,7 @@ const Index = () => {
 
       if (formattedMessages.length === 0) {
         formattedMessages.push({
-          content: "Hi! I'm CHICHA, your friendly AI assistant. I can search the web to help answer your questions and translate content into multiple languages including English, Hindi, Marathi, Sanskrit, Urdu (اردو), and Arabic (العربية). How can I help you today?",
+          content: "Welcome to CHICHA AI! How can I help you today? I can chat, answer questions about images you upload, or search the web if you type '/search your query'.",
           isBot: true,
         });
       }
@@ -189,11 +189,9 @@ const Index = () => {
   const handleSendMessage = async (content: string, options?: { targetLanguage?: string }) => {
     if (!currentChatId) return;
 
-    // Check if user is requesting a response in a specific language
     const promptLower = content.toLowerCase();
     let detectedLanguage = options?.targetLanguage;
     
-    // Detect language requests in the prompt
     if (promptLower.includes("in urdu") || promptLower.includes("to urdu") || 
         promptLower.includes("respond in urdu") || promptLower.includes("answer in urdu") || 
         promptLower.includes("reply in urdu") || promptLower.includes("using urdu") ||
@@ -314,7 +312,7 @@ const Index = () => {
   const handleNewChat = async () => {
     setMessages([
       {
-        content: "Hi! I'm CHICHA, your friendly AI assistant powered by Gemini. I can search the web to help answer your questions and translate content into multiple languages including English, Hindi, Marathi, Sanskrit, Urdu (اردو), and Arabic (العربية). How can I help you today?",
+        content: "Welcome to CHICHA AI! How can I help you today? I can chat, answer questions about images you upload, or search the web if you type '/search your query'.",
         isBot: true,
       },
     ]);
@@ -330,16 +328,21 @@ const Index = () => {
     }
   };
 
-  const toggleSidebar = () => {
-    setIsSidebarVisible(!isSidebarVisible);
+  const formatChatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: true 
+    });
   };
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
       {/* Backdrop overlay for mobile */}
       {isMobileView && isSidebarVisible && (
         <div 
-          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-30"
+          className="fixed inset-0 bg-black/50 z-30"
           onClick={() => setIsSidebarVisible(false)}
         />
       )}
@@ -348,156 +351,147 @@ const Index = () => {
       <aside 
         className={`
           ${isMobileView ? 'fixed' : 'relative'} 
-          z-40 h-full w-[250px]
+          z-40 h-full w-[300px] bg-white border-r border-gray-200
           transition-all duration-300 ease-in-out
           ${isSidebarVisible ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
-        <div className="w-full h-full border-r border-border bg-card p-2 md:p-4 flex flex-col min-h-0">
-          {/* Close button - only on mobile */}
-          {isMobileView && (
+        <div className="w-full h-full flex flex-col">
+          {/* Header */}
+          <div className="p-4 border-b border-gray-200">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-8 h-8 bg-teal-500 rounded-lg flex items-center justify-center">
+                <span className="text-white text-sm font-bold">💬</span>
+              </div>
+              <h1 className="text-xl font-bold text-gray-900">CHICHA</h1>
+            </div>
+            <div className="text-xs text-gray-500 mb-2">CHICHA AI Logo</div>
+          </div>
+
+          {/* New Chat Button */}
+          <div className="p-4">
             <Button 
-              variant="ghost" 
-              onClick={() => setIsSidebarVisible(false)} 
-              size="sm" 
-              className="mb-4 self-end"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-          )}
-          <div className="space-y-4 flex-1 min-h-0 overflow-y-auto">
-            <Button 
-              variant="outline" 
-              onClick={() => navigate("/home")} 
-              className="w-full flex items-center gap-2"
-            >
-              <Home className="h-4 w-4" />
-              Back to Home
-            </Button>
-            <Button 
-              variant="outline" 
               onClick={handleNewChat} 
-              className="w-full flex items-center gap-2"
+              className="w-full bg-teal-500 hover:bg-teal-600 text-white rounded-lg py-3 flex items-center justify-center gap-2"
             >
               <Plus className="h-4 w-4" />
               New Chat
             </Button>
-            <div className="space-y-2">
-              {chatHistory.map((chat) => (
-                <div key={chat.id} className="flex items-center gap-2">
-                  <Button
-                    variant={currentChatId === chat.id ? "secondary" : "ghost"}
-                    onClick={() => loadChat(chat.id)}
-                    className="flex-1 justify-start text-left truncate"
-                  >
-                    {chat.title || "New Chat"}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDeleteChat(chat.id)}
-                    className="h-8 w-8 flex-shrink-0"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
           </div>
-          <Button 
-            variant="outline" 
-            onClick={handleLogout} 
-            className="mt-4 mb-4"
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </Button>
-        </div>
-      </aside>
 
-      {/* Toggle button - visible when sidebar is hidden */}
-      {!isSidebarVisible && (
-        <button
-          className="fixed z-50 top-4 left-4 p-2 bg-background/95 border border-border rounded-md shadow-md hover:bg-accent transition-colors"
-          onClick={() => setIsSidebarVisible(true)}
-        >
-          <ChevronRight className="h-4 w-4" />
-        </button>
-      )}
-
-      {/* Main content area */}
-      <div 
-        className="flex-1 flex flex-col h-full w-full min-h-0 overflow-hidden transition-all duration-300 ease-in-out"
-        style={{
-          marginLeft: isMobileView ? 0 : (isSidebarVisible ? '0' : '0'),
-        }}
-      >
-        {/* Header section */}
-        <div className="mb-2 md:mb-4 text-center flex items-center justify-between w-full">
-          <div className="flex-1 flex items-center">
-            {isSidebarVisible && (
-              <Button 
-                variant="ghost" 
-                onClick={toggleSidebar}
-                className="md:hidden mr-2"
-                size="sm"
+          {/* Chat History */}
+          <div className="flex-1 overflow-y-auto px-4">
+            {chatHistory.map((chat) => (
+              <div 
+                key={chat.id} 
+                className={`
+                  flex items-center justify-between p-3 mb-2 rounded-lg cursor-pointer
+                  ${currentChatId === chat.id ? 'bg-teal-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}
+                `}
+                onClick={() => loadChat(chat.id)}
               >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-            )}
+                <div className="flex-1">
+                  <div className="text-sm font-medium">
+                    Chat - {formatChatTime(chat.created_at)}
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteChat(chat.id);
+                  }}
+                  className={`h-6 w-6 ${currentChatId === chat.id ? 'text-white hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            ))}
           </div>
-          <div className="flex items-center justify-center gap-2">
-            <img 
-              src="/lovable-uploads/8af0d91e-2677-445f-9de9-657b8af84348.png" 
-              alt="CHICHA Logo" 
-              className="w-10 h-10 md:w-16 md:h-16 object-contain"
-            />
-            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-primary">
-              CHICHA
-            </h1>
-          </div>
-          <div className="flex-1 flex justify-end">
+
+          {/* Footer */}
+          <div className="p-4 border-t border-gray-200 space-y-2">
             <Button 
-              variant="outline" 
-              onClick={handleNewChat}
-              size="sm"
-              className="ml-auto"
+              variant="ghost" 
+              onClick={() => navigate("/home")} 
+              className="w-full justify-start text-gray-600 hover:text-gray-900 hover:bg-gray-100"
             >
-              <Plus className="h-4 w-4" />
-              <span className="hidden md:inline ml-1">New Chat</span>
+              <Home className="h-4 w-4 mr-2" />
+              Back to Home
+            </Button>
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Settings
+            </Button>
+            <Button 
+              variant="ghost" 
+              onClick={handleLogout} 
+              className="w-full justify-start text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
             </Button>
           </div>
         </div>
-        <p className="text-xs md:text-sm text-muted-foreground text-center mb-2 md:mb-4">
-          Your AI Assistant with Web Search and Translation (English, Hindi, Marathi, Sanskrit, Urdu, Arabic)
-        </p>
+      </aside>
+
+      {/* Main content area */}
+      <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
+        {/* Header */}
+        <div className="bg-white border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {!isSidebarVisible && (
+                <Button 
+                  variant="ghost" 
+                  onClick={() => setIsSidebarVisible(true)}
+                  size="sm"
+                >
+                  ☰
+                </Button>
+              )}
+              <div className="w-8 h-8 bg-teal-500 rounded-lg flex items-center justify-center">
+                <span className="text-white text-sm font-bold">💬</span>
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  CHICHA Chat - {new Date().toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    hour12: true 
+                  })}
+                </h2>
+              </div>
+            </div>
+            {isSidebarVisible && !isMobileView && (
+              <Button 
+                variant="ghost" 
+                onClick={() => setIsSidebarVisible(false)}
+                size="sm"
+              >
+                ←
+              </Button>
+            )}
+          </div>
+        </div>
+
         {/* Chat container */}
-        <div className="flex-1 min-h-0 overflow-y-auto rounded-lg border bg-card shadow-sm">
+        <div className="flex-1 min-h-0 overflow-y-auto bg-white">
           <ChatContainer messages={messages} />
         </div>
+
         {/* Input section */}
-        <div className="mt-2 md:mt-4">
+        <div className="bg-white border-t border-gray-200 p-4">
           <ChatInput 
             onSend={handleSendMessage} 
             isLoading={isLoading}
             onImageSelect={setSelectedImage}
           />
         </div>
-        {/* Selected image indicator */}
-        {selectedImage && (
-          <div className="mt-2 flex items-center gap-2 text-xs md:text-sm">
-            <span className="text-muted-foreground truncate">
-              {selectedImage.name}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSelectedImage(null)}
-            >
-              Remove
-            </Button>
-          </div>
-        )}
       </div>
       <Toaster />
     </div>
