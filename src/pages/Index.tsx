@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { ChatContainer } from "@/components/ChatContainer";
 import { ChatInput } from "@/components/ChatInput";
@@ -338,7 +339,7 @@ const Index = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="w-full h-screen flex bg-gray-50 overflow-hidden">
       {/* Backdrop overlay for mobile */}
       {isMobileView && isSidebarVisible && (
         <div 
@@ -351,14 +352,14 @@ const Index = () => {
       <aside 
         className={`
           ${isMobileView ? 'fixed' : 'relative'} 
-          z-40 h-full w-[300px] bg-white border-r border-gray-200
+          z-40 h-full w-[300px] bg-white border-r border-gray-200 flex-shrink-0
           transition-all duration-300 ease-in-out
           ${isSidebarVisible ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
         <div className="w-full h-full flex flex-col">
           {/* Header */}
-          <div className="p-4 border-b border-gray-200">
+          <div className="p-4 border-b border-gray-200 flex-shrink-0">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-8 h-8 bg-teal-500 rounded-lg flex items-center justify-center">
                 <span className="text-white text-sm font-bold">💬</span>
@@ -369,7 +370,7 @@ const Index = () => {
           </div>
 
           {/* New Chat Button */}
-          <div className="p-4">
+          <div className="p-4 flex-shrink-0">
             <Button 
               onClick={handleNewChat} 
               className="w-full bg-teal-500 hover:bg-teal-600 text-white rounded-lg py-3 flex items-center justify-center gap-2"
@@ -380,7 +381,7 @@ const Index = () => {
           </div>
 
           {/* Chat History */}
-          <div className="flex-1 overflow-y-auto px-4">
+          <div className="flex-1 overflow-y-auto px-4 min-h-0">
             {chatHistory.map((chat) => (
               <div 
                 key={chat.id} 
@@ -411,7 +412,7 @@ const Index = () => {
           </div>
 
           {/* Footer */}
-          <div className="p-4 border-t border-gray-200 space-y-2">
+          <div className="p-4 border-t border-gray-200 space-y-2 flex-shrink-0">
             <Button 
               variant="ghost" 
               onClick={() => navigate("/home")} 
@@ -440,9 +441,9 @@ const Index = () => {
       </aside>
 
       {/* Main content area */}
-      <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
+      <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
         {/* Header */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="bg-white border-b border-gray-200 px-6 py-4 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {!isSidebarVisible && (
@@ -480,12 +481,12 @@ const Index = () => {
         </div>
 
         {/* Chat container */}
-        <div className="flex-1 min-h-0 overflow-y-auto bg-white">
+        <div className="flex-1 min-h-0 overflow-hidden bg-white">
           <ChatContainer messages={messages} />
         </div>
 
         {/* Input section */}
-        <div className="bg-white border-t border-gray-200 p-4">
+        <div className="bg-white border-t border-gray-200 p-4 flex-shrink-0">
           <ChatInput 
             onSend={handleSendMessage} 
             isLoading={isLoading}
