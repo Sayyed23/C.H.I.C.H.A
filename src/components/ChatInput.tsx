@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from "react";
 import { Textarea } from "./ui/textarea";
 import { ImagePreview } from "./chat/ImagePreview";
@@ -9,7 +8,7 @@ import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { useMessageHandlers } from "@/hooks/useMessageHandlers";
 import { MessageProcessor } from "./chat/MessageProcessor";
 import { Button } from "./ui/button";
-import { Mic, MicOff, Wand2, Image, Scissors, Paperclip, Send } from "lucide-react";
+import { Mic, MicOff, Wand2, Image, Scissors, Paperclip, Send, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { VoiceAssistant } from "./VoiceAssistant";
@@ -31,6 +30,8 @@ export const ChatInput = ({
   const [message, setMessage] = useState("");
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
   const [isImageEditMode, setIsImageEditMode] = useState(false);
+  const [isWebSearchEnabled, setIsWebSearchEnabled] = useState(false);
+  
   const {
     imageFiles,
     imagePreviews,
@@ -67,6 +68,13 @@ export const ChatInput = ({
 
   const handleSend = useCallback(async () => {
     if (!message.trim() && imageFiles.length === 0) return;
+    
+    // If web search is enabled, prepend /search to the message
+    let finalMessage = message;
+    if (isWebSearchEnabled && !message.startsWith('/search')) {
+      finalMessage = `/search ${message}`;
+    }
+    
     let imageUrls: string[] = [];
     if (imageFiles.length > 0) {
       try {
@@ -99,16 +107,18 @@ export const ChatInput = ({
       setMessage("");
       clearImages();
       setIsImageEditMode(false);
+      setIsWebSearchEnabled(false);
       return;
     }
 
-    const handled = await processMessage(message, imageUrls, selectedLanguage);
+    const handled = await processMessage(finalMessage, imageUrls, selectedLanguage);
 
     setMessage("");
     clearImages();
     setSelectedLanguage(null);
     setIsImageEditMode(false);
-  }, [message, imageFiles, onSend, selectedLanguage, processMessage, clearImages, isImageEditMode, handleEditImage]);
+    setIsWebSearchEnabled(false);
+  }, [message, imageFiles, onSend, selectedLanguage, processMessage, clearImages, isImageEditMode, handleEditImage, isWebSearchEnabled]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -126,6 +136,14 @@ export const ChatInput = ({
 
   const handleVoiceAssistantMessage = (voiceMessage: string) => {
     setMessage(voiceMessage);
+  };
+
+  const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setMessage(e.target.value);
+  };
+
+  const toggleWebSearch = () => {
+    setIsWebSearchEnabled(!isWebSearchEnabled);
   };
 
   return (
@@ -164,6 +182,25 @@ export const ChatInput = ({
           )}
         </div>
       )}
+
+      {/* Web Search Toggle - only visible when typing */}
+      {message.trim() && (
+        <div className="flex items-center gap-2 px-2">
+          <div className="flex items-center gap-2">
+            <div 
+              className={`flex items-center gap-2 px-3 py-2 rounded-full cursor-pointer transition-colors ${
+                isWebSearchEnabled 
+                  ? 'bg-teal-100 text-teal-700' 
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+              onClick={toggleWebSearch}
+            >
+              <Globe className="h-4 w-4" />
+              <span className="text-sm font-medium">Web</span>
+            </div>
+          </div>
+        </div>
+      )}
       
       <div className="relative flex items-center gap-2 p-2 border border-gray-200 rounded-lg bg-white">
         <Button
@@ -178,7 +215,7 @@ export const ChatInput = ({
         
         <Textarea 
           value={message} 
-          onChange={(e) => setMessage(e.target.value)} 
+          onChange={handleMessageChange} 
           onKeyDown={handleKeyDown} 
           placeholder={
             isRecording 
