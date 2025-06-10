@@ -17,7 +17,8 @@ export const handleWebSearch = async (
   }
   
   try {
-    onSend(`🔍 Searching the web for: "${searchQuery}"...`);
+    // Don't send the "Searching..." message, let the user message show just the query
+    // and send results directly as AI response
     
     const { data, error } = await supabase.functions.invoke('web-search', {
       body: { query: searchQuery, engine: 'google' },
