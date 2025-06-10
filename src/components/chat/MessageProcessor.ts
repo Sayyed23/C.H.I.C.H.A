@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { type Toast } from "@/hooks/use-toast";
 import { toast } from "@/hooks/use-toast";
@@ -15,6 +14,55 @@ export const MessageProcessor = (options: MessageProcessorOptions) => {
     imageUrls: string[] = [], 
     selectedLanguage: string | null = null
   ) => {
+    // Check for web search request first
+    const searchMatch = message.match(/^\/search\s+(.+)/i);
+    if (searchMatch) {
+      const searchQuery = searchMatch[1].trim();
+      
+      if (!searchQuery) {
+        onSend("Please provide a search query. For example: '/search latest AI news'");
+        return true;
+      }
+      
+      try {
+        onSend(`🔍 Searching the web for: "${searchQuery}"...`);
+        
+        const { data, error } = await supabase.functions.invoke('web-search', {
+          body: { query: searchQuery, engine: 'google' },
+        });
+
+        if (error) {
+          throw new Error(`Search API error: ${error.message}`);
+        }
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        if (data && data.results && data.results.length > 0) {
+          const resultsMessage = data.results
+            .slice(0, 5) // Limit to top 5 results
+            .map((result: any) => `### [${result.title}](${result.url})\n${result.domain}\n${result.snippet || ''}`)
+            .join('\n\n');
+          onSend(`## Search results for "${searchQuery}":\n\n${resultsMessage}`);
+        } else {
+          onSend(`No search results found for "${searchQuery}". Please try a different search term.`);
+        }
+      } catch (error) {
+        console.error('Web search error:', error);
+        
+        onSend(`⚠️ Search error: ${error instanceof Error ? error.message : 'Failed to search the web. Please try again later.'}`);
+        
+        toast({
+          title: "Search Error",
+          description: "Failed to perform web search. Please try again.",
+          variant: "destructive",
+        });
+      }
+      
+      return true;
+    }
+
     // Check if the message is a navigation request
     const navigationMatch = message.match(/From:\s*([^To]+)\s*To:\s*(.+)/i);
     if (navigationMatch) {
