@@ -28,9 +28,11 @@ export const useChatLogic = ({ currentChatId, onMessagesChange, onLoadingChange 
 
   // Create MessageProcessor instance
   const messageProcessor = MessageProcessor({
-    onSend: (message: string, options?: { targetLanguage?: string }) => {
-      // Only add AI responses, never add user messages here
-      setMessages((prev) => [...prev, { content: message, isBot: true }]);
+    onSend: (messageContentFromHandler: string, options?: { targetLanguage?: string }) => {
+      // This callback is used by handlers (like web search, weather) to send their responses.
+      // These are always considered bot messages.
+      console.log("MessageProcessor.onSend: Adding bot/handler message to messages:", { content: messageContentFromHandler, isBot: true });
+      setMessages((prev) => [...prev, { content: messageContentFromHandler, isBot: true }]);
     }
   });
 
@@ -102,34 +104,38 @@ export const useChatLogic = ({ currentChatId, onMessagesChange, onLoadingChange 
       detectedLanguage = "ar";
     }
 
-    // Check if this is a search command
     const searchMatch = content.match(/^\/search\s+(.+)/i);
-    let userDisplayMessage = content;
     
     if (searchMatch) {
-      // For search commands, show only the search query to the user
-      userDisplayMessage = searchMatch[1].trim();
+      const searchQueryText = searchMatch[1].trim(); // This is the part after "/search ", e.g., "who is modi"
       
-      // Add user message first (only the clean search query)
-      setMessages((prev) => [...prev, { content: userDisplayMessage, isBot: false }]);
+      // Add the user's actual search query (e.g., "who is modi") to messages, marked as not from bot.
+      console.log("handleSendMessage: Adding user's search query to messages:", { content: searchQueryText, isBot: false });
+      setMessages((prev) => [...prev, { content: searchQueryText, isBot: false }]);
       
-      // Process the search command - this will add AI responses via MessageProcessor
+      // Process the original, full command (e.g., "/search who is modi").
+      // The MessageProcessor will use its onSend callback (defined above) to add AI responses.
       await messageProcessor.processMessage(content, [], detectedLanguage);
-      return; // Don't continue to regular AI processing
+      return; // Processing for search command is complete.
     }
 
-    // For non-search messages, add user message and continue with regular processing
-    setMessages((prev) => [...prev, { content: userDisplayMessage, isBot: false }]);
+    // For non-search messages:
+    // Add the user's original message to messages, marked as not from bot.
+    console.log("handleSendMessage: Adding user's general message to messages:", { content: content, isBot: false });
+    setMessages((prev) => [...prev, { content: content, isBot: false }]);
 
-    // Process the message using MessageProcessor (for other handlers)
-    const wasProcessed = await messageProcessor.processMessage(content, [], detectedLanguage);
+    // Process the message using MessageProcessor (for other handlers like weather, distance, etc.)
+    // The `content` here is the original user message.
+    const wasProcessedByHandler = await messageProcessor.processMessage(content, [], detectedLanguage);
     
-    // If it was processed by a handler (like weather, distance, etc.), don't send to AI
-    if (wasProcessed) {
+    if (wasProcessedByHandler) {
+      // If a handler (e.g., weather) processed it and sent a response via MessageProcessor.onSend,
+      // then no need to send to the main AI.
       return;
     }
 
-    // If not processed by handlers, send to AI as normal
+    // If not processed by any specific handler, send to the main AI.
+    console.log("handleSendMessage: Sending message to main AI. Adding processing placeholder.");
     setMessages((prev) => [...prev, { content: "", isBot: true, isProcessing: true }]);
     setIsLoading(true);
 
@@ -138,7 +144,7 @@ export const useChatLogic = ({ currentChatId, onMessagesChange, onLoadingChange 
         .from('messages')
         .insert({
           chat_id: currentChatId,
-          content: userDisplayMessage,
+          content: content, // Log the original content from the user
           is_bot: false,
         });
 
@@ -166,9 +172,10 @@ export const useChatLogic = ({ currentChatId, onMessagesChange, onLoadingChange 
           content: data.response,
           is_bot: true,
         });
-
+      
+      console.log("handleSendMessage: Received AI response. Updating messages.");
       setMessages((prev) => [
-        ...prev.slice(0, -1),
+        ...prev.slice(0, -1), // Remove the processing placeholder
         { 
           content: data.response, 
           isBot: true, 
@@ -180,7 +187,9 @@ export const useChatLogic = ({ currentChatId, onMessagesChange, onLoadingChange 
     } catch (error) {
       console.error('Error calling Gemini:', error);
       
+      console.log("handleSendMessage: Error with AI. Removing processing placeholder if exists and adding error message.");
       setMessages((prev) => {
+        // Remove processing message if it's the last one
         if (prev.length > 0 && prev[prev.length - 1].isBot && prev[prev.length - 1].isProcessing) {
           return prev.slice(0, -1);
         }
