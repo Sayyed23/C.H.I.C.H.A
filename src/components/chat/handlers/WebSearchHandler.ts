@@ -27,28 +27,38 @@ export const handleWebSearch = async (
 
     if (error) {
       console.error('Supabase function error:', error);
-      onSend(searchQuery);
-      return true;
+      // Return false to let the main AI handle the original message
+      return false;
     }
     
     if (data?.error) {
       console.error('Search API returned error:', data.error);
-      onSend(searchQuery);
-      return true;
+      // Return false to let the main AI handle the original message
+      return false;
     }
     
-    // Always return just the search query, regardless of results
-    onSend(searchQuery);
+    // If we have results, format and send them
+    if (data && data.results && data.results.length > 0) {
+      const resultsMessage = data.results
+        .map((result: any) => `### [${result.title}](${result.url})\n${result.domain}\n${result.snippet || ''}`)
+        .join('\n\n');
+      onSend(`## Search results from ${data.engine || 'google'}:\n\n${resultsMessage}`);
+      return true;
+    } else {
+      // No results found, let main AI handle the query
+      console.log('No search results found, passing to main AI');
+      return false;
+    }
   } catch (error) {
     console.error('Web search error:', error);
-    onSend(searchQuery);
     
     toast({
       title: "Search Error",
-      description: "Failed to perform web search. Please try again.",
+      description: "Failed to perform web search. Processing with AI instead.",
       variant: "destructive",
     });
+    
+    // Return false to let the main AI handle the original message
+    return false;
   }
-  
-  return true;
 };
