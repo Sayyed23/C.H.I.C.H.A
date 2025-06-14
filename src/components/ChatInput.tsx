@@ -8,7 +8,7 @@ import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { useMessageHandlers } from "@/hooks/useMessageHandlers";
 import { MessageProcessor } from "./chat/MessageProcessor";
 import { Button } from "./ui/button";
-import { Mic, MicOff, Wand2, Image, Scissors, Paperclip, Send, Globe } from "lucide-react";
+import { Mic, MicOff, Wand2, Image, Scissors, Paperclip, Send, Globe, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { VoiceAssistant } from "./VoiceAssistant";
@@ -183,21 +183,28 @@ export const ChatInput = ({
         </div>
       )}
 
-      {/* Web Search Toggle - only visible when typing */}
+      {/* Enhanced Web Search Toggle */}
       {message.trim() && (
         <div className="flex items-center gap-2 px-2">
           <div className="flex items-center gap-2">
             <div 
-              className={`flex items-center gap-2 px-3 py-2 rounded-full cursor-pointer transition-colors ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-full cursor-pointer transition-all duration-200 ${
                 isWebSearchEnabled 
-                  ? 'bg-teal-100 text-teal-700' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-teal-100 text-teal-700 border-2 border-teal-300 shadow-sm' 
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-2 border-transparent'
               }`}
               onClick={toggleWebSearch}
             >
-              <Globe className="h-4 w-4" />
-              <span className="text-sm font-medium">Web</span>
+              <Search className="h-4 w-4" />
+              <span className="text-sm font-medium">
+                {isWebSearchEnabled ? 'Web Search ON' : 'Enable Web Search'}
+              </span>
             </div>
+            {isWebSearchEnabled && (
+              <div className="text-xs text-teal-600 bg-teal-50 px-2 py-1 rounded">
+                Your message will search the web
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -224,7 +231,9 @@ export const ChatInput = ({
                 ? "Describe how to edit the image..." 
                 : imageFiles.length > 0 
                   ? "Ask about the images..." 
-                  : "Ask CHICHA... or type /search <your query>"
+                  : isWebSearchEnabled
+                    ? "Enter your search query..."
+                    : "Ask CHICHA... or type /search <your query>"
           }
           className="min-h-[40px] max-h-[120px] resize-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 flex-1 bg-transparent"
           rows={1}
