@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -38,25 +39,21 @@ export const handleWebSearch = async (
       console.log(`Found ${data.results.length} search results. Formatting for display.`);
       
       const titlesList = data.results
-        .slice(0, 5) // Limiting to 5 results for display
+        .slice(0, 5)
         .map((result: any, index: number) => {
           const title = result.title || 'Untitled';
-          return `${index + 1}. ${title}`; // Only display the title/question
+          return `${index + 1}. ${title}`;
         })
-        .join('\n'); // Join with a simple newline
+        .join('\n');
       
-      const formattedMessage = `## 🔍 Search Results for "${searchQuery}"\n\n${titlesList}`;
-      onSend(formattedMessage);
+      onSend(titlesList);
     } else {
       console.log('No search results found for query:', searchQuery);
-      onSend(`## 🔍 Search Results for "${searchQuery}"\n\nNo search results found. This could be due to:\n- The search term being too specific\n- Temporary issues with the search service\n- Network connectivity problems\n\nPlease try:\n- Using different or more general search terms\n- Checking your internet connection\n- Trying again in a few moments`);
+      onSend(searchQuery);
     }
   } catch (error) {
     console.error('Web search error:', error);
-    
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    
-    onSend(`## ⚠️ Search Error\n\nI encountered an issue while searching for "${searchQuery}":\n\n**Error:** ${errorMessage}\n\nPlease try:\n- Checking your internet connection\n- Using different search terms\n- Trying again in a few moments\n\nIf the problem persists, the search service might be temporarily unavailable.`);
+    onSend(searchQuery);
     
     toast({
       title: "Search Error",
