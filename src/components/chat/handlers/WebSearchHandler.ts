@@ -36,23 +36,25 @@ export const handleWebSearch = async (
     }
     
     if (data && data.results && Array.isArray(data.results) && data.results.length > 0) {
-      console.log(`Found ${data.results.length} search results`);
+      console.log(`Found ${data.results.length} search results. Formatting for display.`);
       
-      const resultsMessage = data.results
-        .slice(0, 5)
+      const resultsList = data.results
+        .slice(0, 5) // Limiting to 5 results for display
         .map((result: any, index: number) => {
           const title = result.title || 'Untitled';
           const url = result.url || '#';
-          const domain = result.domain || new URL(url).hostname;
+          const domain = result.domain || (url !== '#' ? new URL(url).hostname : 'N/A');
           const snippet = result.snippet || 'No description available';
           
           return `**${index + 1}. [${title}](${url})**\n*${domain}*\n${snippet}`;
         })
-        .join('\n\n---\n\n');
+        .join('\n\n---\n\n'); // Separator between results
       
-      onSend(`## 🔍 Search Results for "${searchQuery}"\n\nI found ${data.results.length} results:\n\n${resultsMessage}\n\n---\n\n*Search powered by ${data.engine || 'web search'}*`);
+      // Removed "I found X results:" from the beginning of the message
+      const formattedMessage = `## 🔍 Search Results for "${searchQuery}"\n\n${resultsList}\n\n---\n\n*Search powered by ${data.engine || 'web search'}*`;
+      onSend(formattedMessage);
     } else {
-      console.log('No search results found');
+      console.log('No search results found for query:', searchQuery);
       onSend(`## 🔍 Search Results for "${searchQuery}"\n\nNo search results found. This could be due to:\n- The search term being too specific\n- Temporary issues with the search service\n- Network connectivity problems\n\nPlease try:\n- Using different or more general search terms\n- Checking your internet connection\n- Trying again in a few moments`);
     }
   } catch (error) {
@@ -71,3 +73,4 @@ export const handleWebSearch = async (
   
   return true;
 };
+
