@@ -238,13 +238,13 @@ const Index = () => {
       }
     }
 
-    // Check if this is a search command
+    // Check if this is a search command but show clean user message
     const searchMatch = content.match(/^\/search\s+(.+)/i);
     let userDisplayMessage = content;
     
     if (searchMatch) {
-      const searchQuery = searchMatch[1].trim();
-      userDisplayMessage = `Search: ${searchQuery}`;
+      // For search commands, only show the actual query to the user
+      userDisplayMessage = searchMatch[1].trim();
     }
 
     const userMessage = imageUrl 
@@ -253,7 +253,7 @@ const Index = () => {
 
     setMessages((prev) => [...prev, { content: userMessage, isBot: false }]);
 
-    // Process the message using MessageProcessor
+    // Process the message using MessageProcessor (pass original content with /search prefix)
     const wasProcessed = await messageProcessor.processMessage(content, imageUrl ? [imageUrl] : [], detectedLanguage);
     
     // If it was processed by a handler (like web search), don't send to AI
