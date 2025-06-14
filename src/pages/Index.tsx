@@ -7,6 +7,7 @@ import { LogOut, Plus, Trash2, Settings, Home, Menu } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { useNavigate } from "react-router-dom";
+import { MessageProcessor } from "@/components/chat/MessageProcessor";
 
 interface Message {
   content: string;
@@ -38,6 +39,14 @@ const Index = () => {
   const [isSidebarVisible, setIsSidebarVisible] = useState(false);
   const [isMobileView, setIsMobileView] = useState(window.innerWidth < 768);
   const { transcript, isListening, startListening, stopListening } = useSpeechRecognition();
+
+  // Create MessageProcessor instance
+  const messageProcessor = MessageProcessor({
+    onSend: (message: string, options?: { targetLanguage?: string }) => {
+      // This will be called by handlers to send AI responses
+      setMessages((prev) => [...prev, { content: message, isBot: true }]);
+    }
+  });
 
   useEffect(() => {
     const initializeChat = async () => {
@@ -245,7 +254,7 @@ const Index = () => {
     setMessages((prev) => [...prev, { content: userMessage, isBot: false }]);
 
     // Process the message using MessageProcessor
-    const wasProcessed = await processMessage(content, imageUrl ? [imageUrl] : [], detectedLanguage);
+    const wasProcessed = await messageProcessor.processMessage(content, imageUrl ? [imageUrl] : [], detectedLanguage);
     
     // If it was processed by a handler (like web search), don't send to AI
     if (!wasProcessed) {
