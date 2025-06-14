@@ -229,11 +229,30 @@ const Index = () => {
       }
     }
 
+    // Check if this is a search command
+    const searchMatch = content.match(/^\/search\s+(.+)/i);
+    let userDisplayMessage = content;
+    
+    if (searchMatch) {
+      const searchQuery = searchMatch[1].trim();
+      userDisplayMessage = `Search: ${searchQuery}`;
+    }
+
     const userMessage = imageUrl 
-      ? `${content}\n![Image](${imageUrl})`
-      : content;
+      ? `${userDisplayMessage}\n![Image](${imageUrl})`
+      : userDisplayMessage;
 
     setMessages((prev) => [...prev, { content: userMessage, isBot: false }]);
+
+    // Process the message using MessageProcessor
+    const wasProcessed = await processMessage(content, imageUrl ? [imageUrl] : [], detectedLanguage);
+    
+    // If it was processed by a handler (like web search), don't send to AI
+    if (!wasProcessed) {
+      return;
+    }
+
+    // If not processed by handlers, send to AI as normal
     setMessages((prev) => [...prev, { content: "", isBot: true, isProcessing: true }]);
     setIsLoading(true);
 
