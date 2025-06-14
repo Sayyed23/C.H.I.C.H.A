@@ -16,40 +16,34 @@ export const MessageProcessor = (options: MessageProcessorOptions) => {
   const processMessage = async (
     message: string, 
     imageUrls: string[] = [], 
-    selectedLanguage: string | null = null
-  ) => {
+    selectedLanguage: string | null = null // This parameter is kept for potential future use by handlers
+  ): Promise<boolean> => {
     // Check if it's a search query
     const searchMatch = message.match(/^\/search\s+(.+)/i);
     if (searchMatch) {
-      const searchQuery = searchMatch[1].trim();
-      
-      // Process the search - this will send AI responses
-      const wasHandled = await handleWebSearch(message, onSend);
-      
-      if (wasHandled) {
-        // Return false to indicate this was processed as a special command
-        // The calling code should not send this message as a regular user message
-        return false;
+      // Attempt to handle web search. handleWebSearch will call onSend with results.
+      // It returns true if it successfully handled and sent a message.
+      if (await handleWebSearch(message, onSend)) {
+        return true; // Indicate message was handled by web search
       }
+      // If handleWebSearch returns false (e.g., invalid /search command format handled internally),
+      // we might still consider it "handled" in the sense that it shouldn't go to general AI.
+      // However, typical flow is handleWebSearch sends its own error message via onSend.
+      // For simplicity, if handleWebSearch itself managed the response (even an error message to user), it's "handled".
     }
 
-    // Try other handlers in order
-    if (handleNavigation(message, onSend)) return false;
-    if (await handleWeather(message, onSend)) return false;
-    if (await handleDistance(message, onSend)) return false;
-    if (await handleLocation(message, onSend)) return false;
-    if (await handleImageGeneration(message, imageUrls, onSend)) return false;
+    // Try other handlers in order. Each handler should call onSend if it processes the message.
+    if (handleNavigation(message, onSend)) return true;
+    if (await handleWeather(message, onSend)) return true;
+    if (await handleDistance(message, onSend)) return true;
+    if (await handleLocation(message, onSend)) return true;
+    if (await handleImageGeneration(message, imageUrls, onSend)) return true;
 
-    // If no special processing was done, combine message and image URLs into a single message string
-    const fullMessage = [
-      message,
-      ...imageUrls.map(url => `![Image](${url})`)
-    ].filter(Boolean).join('\n');
-
-    // Pass selected language if available
-    onSend(fullMessage, { targetLanguage: selectedLanguage || undefined });
-    return true;
+    // If no special processing was done by any handler, return false.
+    // ChatLogic will then proceed to send the original message to the main AI.
+    return false; 
   };
 
   return { processMessage };
 };
+
