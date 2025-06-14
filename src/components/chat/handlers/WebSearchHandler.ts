@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -38,20 +37,15 @@ export const handleWebSearch = async (
     if (data && data.results && Array.isArray(data.results) && data.results.length > 0) {
       console.log(`Found ${data.results.length} search results. Formatting for display.`);
       
-      const resultsList = data.results
+      const titlesList = data.results
         .slice(0, 5) // Limiting to 5 results for display
         .map((result: any, index: number) => {
           const title = result.title || 'Untitled';
-          const url = result.url || '#';
-          const domain = result.domain || (url !== '#' ? new URL(url).hostname : 'N/A');
-          const snippet = result.snippet || 'No description available';
-          
-          return `**${index + 1}. [${title}](${url})**\n*${domain}*\n${snippet}`;
+          return `${index + 1}. ${title}`; // Only display the title/question
         })
-        .join('\n\n---\n\n'); // Separator between results
+        .join('\n'); // Join with a simple newline
       
-      // Removed "I found X results:" from the beginning of the message
-      const formattedMessage = `## 🔍 Search Results for "${searchQuery}"\n\n${resultsList}\n\n---\n\n*Search powered by ${data.engine || 'web search'}*`;
+      const formattedMessage = `## 🔍 Search Results for "${searchQuery}"\n\n${titlesList}`;
       onSend(formattedMessage);
     } else {
       console.log('No search results found for query:', searchQuery);
@@ -73,4 +67,3 @@ export const handleWebSearch = async (
   
   return true;
 };
-
