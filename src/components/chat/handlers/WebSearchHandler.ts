@@ -27,30 +27,18 @@ export const handleWebSearch = async (
 
     if (error) {
       console.error('Supabase function error:', error);
-      throw new Error(`Search API error: ${error.message}`);
+      onSend(searchQuery);
+      return true;
     }
     
     if (data?.error) {
       console.error('Search API returned error:', data.error);
-      throw new Error(data.error);
+      onSend(searchQuery);
+      return true;
     }
     
-    if (data && data.results && Array.isArray(data.results) && data.results.length > 0) {
-      console.log(`Found ${data.results.length} search results. Formatting for display.`);
-      
-      const titlesList = data.results
-        .slice(0, 5)
-        .map((result: any, index: number) => {
-          const title = result.title || 'Untitled';
-          return `${index + 1}. ${title}`;
-        })
-        .join('\n');
-      
-      onSend(titlesList);
-    } else {
-      console.log('No search results found for query:', searchQuery);
-      onSend(searchQuery);
-    }
+    // Always return just the search query, regardless of results
+    onSend(searchQuery);
   } catch (error) {
     console.error('Web search error:', error);
     onSend(searchQuery);
