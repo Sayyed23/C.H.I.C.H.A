@@ -27,14 +27,16 @@ export const handleWebSearch = async (
 
     if (error) {
       console.error('Supabase function error:', error);
-      // Return false to let the main AI handle the original message
-      return false;
+      // Process the search query as a regular AI question
+      onSend(`Tell me about: ${searchQuery}`);
+      return true;
     }
     
     if (data?.error) {
       console.error('Search API returned error:', data.error);
-      // Return false to let the main AI handle the original message
-      return false;
+      // Process the search query as a regular AI question
+      onSend(`Tell me about: ${searchQuery}`);
+      return true;
     }
     
     // If we have results, format and send them
@@ -45,9 +47,10 @@ export const handleWebSearch = async (
       onSend(`## Search results from ${data.engine || 'google'}:\n\n${resultsMessage}`);
       return true;
     } else {
-      // No results found, let main AI handle the query
-      console.log('No search results found, passing to main AI');
-      return false;
+      // No results found, process as regular AI question
+      console.log('No search results found, processing as AI question');
+      onSend(`Tell me about: ${searchQuery}`);
+      return true;
     }
   } catch (error) {
     console.error('Web search error:', error);
@@ -58,7 +61,8 @@ export const handleWebSearch = async (
       variant: "destructive",
     });
     
-    // Return false to let the main AI handle the original message
-    return false;
+    // Process the search query as a regular AI question
+    onSend(`Tell me about: ${searchQuery}`);
+    return true;
   }
 };
