@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { MessageProcessor } from "./MessageProcessor";
@@ -103,22 +102,29 @@ export const useChatLogic = ({ currentChatId, onMessagesChange, onLoadingChange 
       detectedLanguage = "ar";
     }
 
-    // Determine what to show as the user message - always show the original user input
+    // Check if this is a search command
+    const searchMatch = content.match(/^\/search\s+(.+)/i);
     let userDisplayMessage = content;
     
-    // For search commands, show only the search query to the user
-    const searchMatch = content.match(/^\/search\s+(.+)/i);
     if (searchMatch) {
+      // For search commands, show only the search query to the user
       userDisplayMessage = searchMatch[1].trim();
+      
+      // Add user message first (only the clean search query)
+      setMessages((prev) => [...prev, { content: userDisplayMessage, isBot: false }]);
+      
+      // Process the search command - this will add AI responses via MessageProcessor
+      await messageProcessor.processMessage(content, [], detectedLanguage);
+      return; // Don't continue to regular AI processing
     }
 
-    // Add user message first (only the clean user input)
+    // For non-search messages, add user message and continue with regular processing
     setMessages((prev) => [...prev, { content: userDisplayMessage, isBot: false }]);
 
-    // Process the message using MessageProcessor (pass original content with any commands)
+    // Process the message using MessageProcessor (for other handlers)
     const wasProcessed = await messageProcessor.processMessage(content, [], detectedLanguage);
     
-    // If it was processed by a handler (like web search), don't send to AI
+    // If it was processed by a handler (like weather, distance, etc.), don't send to AI
     if (wasProcessed) {
       return;
     }
