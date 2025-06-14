@@ -30,6 +30,7 @@ export const useChatLogic = ({ currentChatId, onMessagesChange, onLoadingChange 
   // Create MessageProcessor instance
   const messageProcessor = MessageProcessor({
     onSend: (message: string, options?: { targetLanguage?: string }) => {
+      // Only add AI responses, never add user messages here
       setMessages((prev) => [...prev, { content: message, isBot: true }]);
     }
   });
@@ -102,24 +103,23 @@ export const useChatLogic = ({ currentChatId, onMessagesChange, onLoadingChange 
       detectedLanguage = "ar";
     }
 
-    // Check if this is a search command but show clean user message
-    const searchMatch = content.match(/^\/search\s+(.+)/i);
+    // Determine what to show as the user message - always show the original user input
     let userDisplayMessage = content;
     
+    // For search commands, show only the search query to the user
+    const searchMatch = content.match(/^\/search\s+(.+)/i);
     if (searchMatch) {
-      // For search commands, only show the actual query to the user
       userDisplayMessage = searchMatch[1].trim();
     }
 
-    const userMessage = userDisplayMessage;
+    // Add user message first (only the clean user input)
+    setMessages((prev) => [...prev, { content: userDisplayMessage, isBot: false }]);
 
-    setMessages((prev) => [...prev, { content: userMessage, isBot: false }]);
-
-    // Process the message using MessageProcessor (pass original content with /search prefix)
+    // Process the message using MessageProcessor (pass original content with any commands)
     const wasProcessed = await messageProcessor.processMessage(content, [], detectedLanguage);
     
     // If it was processed by a handler (like web search), don't send to AI
-    if (!wasProcessed) {
+    if (wasProcessed) {
       return;
     }
 
@@ -132,7 +132,7 @@ export const useChatLogic = ({ currentChatId, onMessagesChange, onLoadingChange 
         .from('messages')
         .insert({
           chat_id: currentChatId,
-          content: userMessage,
+          content: userDisplayMessage,
           is_bot: false,
         });
 
