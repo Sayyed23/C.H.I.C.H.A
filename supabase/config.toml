@@ -1,5 +1,1 @@
-
 project_id = "emsuybvkjowipxjddctm"
-
-[functions.generate-childhood-image-hf]
-verify_jwt = false
