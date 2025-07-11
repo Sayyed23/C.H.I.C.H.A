@@ -22,7 +22,7 @@ serve(async (req) => {
     const { prompt, imageUrl } = await req.json();
     console.log('Received request with prompt:', prompt);
 
-    let systemContext = "You are CHICHA, a helpful AI assistant. Provide concise answers in 10-15 lines maximum. If applicable, use numbered points. Avoid special characters and only mention dates/times if specifically asked. Focus on the most relevant information.";
+    let systemContext = "You are CHICHA, a helpful AI assistant. Provide clear, well-structured answers. Use proper formatting with bullet points or numbered lists when appropriate. Keep responses concise but informative. Focus on the most relevant information for the user's query.";
 
     const requestBody = {
       contents: [{
@@ -75,10 +75,19 @@ serve(async (req) => {
     console.log('Received response from Gemini API:', data);
 
     if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
+      console.error('Invalid Gemini response structure:', data);
       throw new Error('Invalid response format from Gemini API');
     }
 
-    const result = data.candidates[0].content.parts[0].text;
+    let result = data.candidates[0].content.parts[0].text;
+    
+    // Clean up the response formatting
+    result = result
+      .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold formatting
+      .replace(/\*(.*?)\*/g, '$1')     // Remove italic formatting
+      .trim();
+
+    // Extract URLs for sources
     const urlPattern = /(https?:\/\/[^\s]+)/g;
     const urls = result.match(urlPattern) || [];
 
@@ -111,10 +120,23 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error('Error in chat-with-gemini function:', error);
+    
+    // Provide more helpful error responses
+    let errorMessage = 'I apologize, but I encountered an issue processing your request. Please try again.';
+    
+    if (error.message.includes('GEMINI_API_KEY')) {
+      errorMessage = 'AI service is currently unavailable. Please check the configuration.';
+    } else if (error.message.includes('quota')) {
+      errorMessage = 'AI service quota exceeded. Please try again later.';
+    }
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: errorMessage,
+        response: errorMessage // Provide the same message as response for fallback
+      }),
       { 
-        status: 500,
+        status: 200, // Return 200 so the client handles it gracefully
         headers: { 
           ...corsHeaders,
           'Content-Type': 'application/json'

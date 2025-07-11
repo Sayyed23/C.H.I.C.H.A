@@ -21,7 +21,7 @@ serve(async (req) => {
 
     console.log('Starting translation request:', { targetLanguage, textLength: text.length });
 
-    const apiKey = Deno.env.get('APILAYER_API_KEY');
+    const apiKey = Deno.env.get('GEMINI_TRANSLATE_API_KEY');
     if (!apiKey) {
       return new Response(
         JSON.stringify({ 
@@ -35,37 +35,52 @@ serve(async (req) => {
       )
     }
 
-    // Map our language codes to APILayer language codes
+    // Map our language codes to full language names for Gemini
     const languageMap: Record<string, string> = {
-      'hi': 'hi', // Hindi
-      'mr': 'mr', // Marathi
-      'sa': 'sa', // Sanskrit
+      'hi': 'Hindi',
+      'mr': 'Marathi', 
+      'sa': 'Sanskrit',
+      'en': 'English',
     };
 
     const targetLang = languageMap[targetLanguage];
     if (!targetLang) {
-      throw new Error(`Unsupported target language: ${targetLanguage}`);
+      return new Response(
+        JSON.stringify({ 
+          error: `Unsupported target language: ${targetLanguage}`,
+          translatedText: text
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        },
+      )
     }
 
-    console.log('Making request to APILayer Translation API with language:', targetLang);
+    console.log('Making request to Gemini Translation API with language:', targetLang);
+
+    const requestBody = {
+      contents: [{
+        parts: [{
+          text: `Translate the following text to ${targetLang}. Return only the translated text without any additional formatting, explanations, or notes:\n\n${text}`
+        }]
+      }]
+    };
 
     const response = await fetch(
-      `https://api.apilayer.com/language_translation/translate?target=${targetLang}&source=en`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
-          'apikey': apiKey,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          text: text
-        })
+        body: JSON.stringify(requestBody),
       }
     );
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('APILayer Translation API error:', errorText);
+      console.error('Gemini Translation API error:', errorText);
       return new Response(
         JSON.stringify({ 
           error: 'Translation service temporarily unavailable',
@@ -79,14 +94,25 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log('APILayer Translation API response:', JSON.stringify(data));
+    console.log('Gemini Translation API response:', JSON.stringify(data));
 
-    if (!data.translated_text) {
-      throw new Error('Invalid response format from APILayer Translation API');
+    if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid response format from Gemini Translation API',
+          translatedText: text
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        },
+      )
     }
 
+    const translatedText = data.candidates[0].content.parts[0].text.trim();
+
     return new Response(
-      JSON.stringify({ translatedText: data.translated_text }),
+      JSON.stringify({ translatedText }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
@@ -97,7 +123,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         error: 'Translation service temporarily unavailable',
-        translatedText: text // Return original text as fallback
+        translatedText: text || 'Translation failed' // Return original text as fallback
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
