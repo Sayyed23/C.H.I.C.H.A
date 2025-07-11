@@ -19,7 +19,16 @@ serve(async (req) => {
 
     if (!FIRECRAWL_API_KEY) {
       console.error('FIRECRAWL_API_KEY is not configured')
-      throw new Error('FIRECRAWL_API_KEY is not configured')
+      return new Response(
+        JSON.stringify({ 
+          error: 'Web search service is currently unavailable',
+          results: []
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        },
+      )
     }
 
     console.log('Making request to Firecrawl API...')
@@ -41,14 +50,23 @@ serve(async (req) => {
       console.error('Firecrawl API error:', response.status, response.statusText)
       const errorText = await response.text()
       console.error('Error details:', errorText)
-      throw new Error(`Firecrawl API error: ${response.statusText || 'Unknown error'} (${response.status})`)
+      return new Response(
+        JSON.stringify({ 
+          error: 'Search service temporarily unavailable',
+          results: []
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        },
+      )
     }
 
     const data = await response.json()
     console.log('Firecrawl API response:', data)
 
     return new Response(
-      JSON.stringify({ results: data.results }),
+      JSON.stringify({ results: data.results || [] }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
@@ -58,12 +76,12 @@ serve(async (req) => {
     console.error('Web search error:', error)
     return new Response(
       JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'An unexpected error occurred',
-        details: error
+        error: 'Search service temporarily unavailable',
+        results: []
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
+        status: 200,
       },
     )
   }

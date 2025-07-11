@@ -179,21 +179,30 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
           body: { query: message },
         });
 
-        if (error) throw error;
+        if (error || !data || !data.results || data.results.length === 0) {
+          // If search fails or no results, proceed with normal AI processing
+          console.log('Web search failed or no results, proceeding with AI');
+          onSend(message, imageUrl);
+          setMessage("");
+          setImageFile(null);
+          setImagePreview(null);
+          return;
+        }
         
-        if (data && data.results) {
+        if (data && data.results && data.results.length > 0) {
           const resultsMessage = data.results
             .map((result: any) => `${result.title}\n${result.url}\n${result.snippet}`)
             .join('\n\n');
           onSend(resultsMessage);
+          setMessage("");
+          setImageFile(null);
+          setImagePreview(null);
+          return;
         }
       } catch (error) {
         console.error('Web search error:', error);
-        toast({
-          title: "Search Error",
-          description: "Failed to fetch real-time information. Please try again.",
-          variant: "destructive",
-        });
+        // If search fails, proceed with normal AI processing without showing error
+        console.log('Search failed, proceeding with normal AI processing');
       }
     }
 
@@ -213,23 +222,20 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
         body: { query: message },
       });
 
-      if (error) throw error;
+      if (error || !data || !data.results || data.results.length === 0) {
+        onSend("No results found for your search. Let me try to help with general information.");
+        return;
+      }
       
       if (data && data.results) {
         const resultsMessage = data.results
           .map((result: any) => `${result.title}\n${result.url}\n${result.snippet}`)
           .join('\n\n');
         onSend(resultsMessage);
-      } else {
-        onSend("No results found for your search.");
       }
     } catch (error) {
       console.error('Web search error:', error);
-      toast({
-        title: "Search Error",
-        description: "Failed to perform web search. Please try again.",
-        variant: "destructive",
-      });
+      onSend("Search failed, but I can still help with general information about your query.");
     }
   };
 

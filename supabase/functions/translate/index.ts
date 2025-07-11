@@ -23,7 +23,16 @@ serve(async (req) => {
 
     const apiKey = Deno.env.get('APILAYER_API_KEY');
     if (!apiKey) {
-      throw new Error('APILayer API key not configured');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Translation service is currently unavailable',
+          translatedText: text // Return original text as fallback
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        },
+      )
     }
 
     // Map our language codes to APILayer language codes
@@ -57,7 +66,16 @@ serve(async (req) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('APILayer Translation API error:', errorText);
-      throw new Error(`APILayer Translation API returned status ${response.status}`);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Translation service temporarily unavailable',
+          translatedText: text // Return original text as fallback
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        },
+      )
     }
 
     const data = await response.json();
@@ -78,12 +96,12 @@ serve(async (req) => {
     console.error('Translation error:', error.message);
     return new Response(
       JSON.stringify({ 
-        error: error.message,
-        details: error instanceof Error ? error.stack : undefined
+        error: 'Translation service temporarily unavailable',
+        translatedText: text // Return original text as fallback
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
+        status: 200,
       },
     )
   }
