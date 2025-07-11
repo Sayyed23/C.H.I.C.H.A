@@ -1,4 +1,3 @@
-
 import { useEffect, useRef } from "react";
 import { ChatMessage } from "./ChatMessage";
 
@@ -22,7 +21,7 @@ export const ChatContainer = ({ messages }: ChatContainerProps) => {
   return (
     <div 
       ref={containerRef}
-      className="flex flex-col gap-4 overflow-y-auto p-4 sm:p-6 h-full w-full"
+      className="flex flex-col gap-4 overflow-y-auto p-4 sm:p-6 h-[calc(100vh-13rem)] sm:h-[calc(100vh-14rem)]"
     >
       {messages.map((message, index) => (
         <ChatMessage

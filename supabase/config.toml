@@ -1,1 +1,10 @@
 project_id = "emsuybvkjowipxjddctm"
+
+[functions.chat-with-gemini]
+verify_jwt = false
+
+[functions.get-chat-history]
+verify_jwt = false
+
+[functions.translate]
+verify_jwt = false

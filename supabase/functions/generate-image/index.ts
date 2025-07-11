@@ -1,5 +1,9 @@
-
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const STABILITY_API_KEY = Deno.env.get('STABILITY_API_KEY');
+const STABILITY_API_HOST = 'https://api.stability.ai';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,108 +16,69 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, imageUrl } = await req.json();
+    const { prompt } = await req.json();
     console.log('Generating image for prompt:', prompt);
-    console.log('Image URL (if any):', imageUrl);
-    
-    const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAiApiKey) {
-      console.error('OPENAI_API_KEY is not set in environment variables');
-      throw new Error('OPENAI_API_KEY is not set');
-    }
 
-    // Enhance the prompt for better results
-    const enhancedPrompt = imageUrl 
-      ? `Transform this image based on the following instruction: ${prompt}` 
-      : prompt;
-
-    // Create the request body based on whether we have an image
-    let requestBody;
-    
-    if (imageUrl) {
-      console.log('Using image-to-image generation mode');
-      
-      // For DALL-E 3, we can't send base64 encoded images directly
-      // We need to first upload the image to get a reference
-      const imageResponse = await fetch(imageUrl);
-      if (!imageResponse.ok) {
-        throw new Error(`Failed to fetch image from ${imageUrl}: ${imageResponse.statusText}`);
-      }
-      
-      const imageBlob = await imageResponse.blob();
-      
-      // Convert blob to form data for the image upload
-      const formData = new FormData();
-      formData.append('image', imageBlob, 'image.png');
-      
-      // Upload the image to OpenAI
-      console.log('Uploading image to OpenAI...');
-      const uploadResponse = await fetch('https://api.openai.com/v1/images/edits', {
+    const response = await fetch(
+      `${STABILITY_API_HOST}/v1/generation/stable-diffusion-v1-6/text-to-image`,
+      {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${openAiApiKey}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: `Bearer ${STABILITY_API_KEY}`,
         },
-        body: formData
-      });
-      
-      if (!uploadResponse.ok) {
-        const errorText = await uploadResponse.text();
-        console.error('Image upload error:', errorText);
-        throw new Error(`Failed to upload image: ${errorText}`);
+        body: JSON.stringify({
+          text_prompts: [{ text: prompt }],
+          cfg_scale: 7,
+          height: 512,
+          width: 512,
+          samples: 1,
+          steps: 30,
+        }),
       }
-      
-      const uploadData = await uploadResponse.json();
-      console.log('Image uploaded successfully:', uploadData);
-      
-      // For text-to-image generation with the uploaded image as reference
-      requestBody = {
-        model: "dall-e-3",
-        prompt: enhancedPrompt,
-        n: 1,
-        size: "1024x1024",
-        quality: "standard",
-        image: uploadData.id || uploadData.url
-      };
-    } else {
-      // For regular text-to-image generation
-      console.log('Using text-to-image generation mode');
-      requestBody = {
-        model: "dall-e-3",
-        prompt: enhancedPrompt,
-        n: 1,
-        size: "1024x1024",
-        quality: "standard"
-      };
-    }
-
-    console.log('Making request to OpenAI API with body:', JSON.stringify(requestBody));
-    const endpoint = imageUrl ? 'https://api.openai.com/v1/images/edits' : 'https://api.openai.com/v1/images/generations';
-    
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody)
-    });
+    );
 
     if (!response.ok) {
       const error = await response.json();
-      console.error('OpenAI API error response:', error);
-      throw new Error(`OpenAI API error: ${JSON.stringify(error)}`);
+      console.error('Stability AI API error:', error);
+      throw new Error(`Stability AI API error: ${JSON.stringify(error)}`);
     }
 
     const data = await response.json();
-    console.log('OpenAI API response received successfully');
+    console.log('Stability AI response received');
+
+    // The API returns base64 encoded images
+    const imageBase64 = data.artifacts[0].base64;
     
-    if (!data.data || data.data.length === 0 || !data.data[0].url) {
-      console.error('No image URL in response data:', data);
-      throw new Error('No image URL in response data');
-    }
+    // Convert base64 to blob and upload to Supabase Storage
+    const imageBlob = await fetch(`data:image/png;base64,${imageBase64}`).then(res => res.blob());
+    
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.png`;
+    
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+    );
+
+    const { data: uploadData, error: uploadError } = await supabaseClient
+      .storage
+      .from('images')
+      .upload(`generated/${fileName}`, imageBlob, {
+        contentType: 'image/png',
+        upsert: false
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data: { publicUrl } } = supabaseClient
+      .storage
+      .from('images')
+      .getPublicUrl(`generated/${fileName}`);
 
     return new Response(
-      JSON.stringify({ imageUrl: data.data[0].url }),
+      JSON.stringify({ imageUrl: publicUrl }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

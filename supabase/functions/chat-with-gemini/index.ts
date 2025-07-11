@@ -1,131 +1,135 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.1.3";
-import { corsHeaders } from "../_shared/cors.ts";
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
-// Initialize Gemini with dedicated Chat API key
-const genAI = new GoogleGenerativeAI(Deno.env.get("GEMINI_CHAT_API_KEY")!);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+console.log("chat-with-gemini function started");
 
-// Simple translation function
-async function translateText(text: string, targetLanguage: string) {
-  if (!targetLanguage) return { translatedText: text };
-
-  console.log(`Translating to ${targetLanguage}`);
-  try {
-    // Try with Gemini first
-    const prompt = `Translate the following text to ${targetLanguage}. Respond with only the translated text:
-    
-    "${text}"`;
-    
-    const result = await model.generateContent(prompt);
-    const translatedText = result.response.text();
-    return { translatedText };
-  } catch (error) {
-    console.error("Translation error:", error);
-    return { error: "Translation failed", translatedText: text };
-  }
-}
-
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { prompt, imageUrl, voice, targetLanguage, isVoiceInput } = await req.json();
-    
-    // Check if this is a code generation request
-    const isCodeRequest = prompt.toLowerCase().includes("generate code") || 
-                         prompt.toLowerCase().includes("write code") ||
-                         prompt.toLowerCase().includes("code example") ||
-                         prompt.toLowerCase().includes("programming") ||
-                         prompt.toLowerCase().includes("function") ||
-                         prompt.toLowerCase().includes("implementation");
-
-    // Check if it's a translation request
-    const isTranslationRequest = prompt.toLowerCase().includes("translate") ||
-                                prompt.toLowerCase().includes("translation") ||
-                                prompt.toLowerCase().includes("convert to") ||
-                                prompt.toLowerCase().includes("in hindi") ||
-                                prompt.toLowerCase().includes("in marathi") ||
-                                prompt.toLowerCase().includes("in sanskrit");
-
-    // Enhance prompt for code generation
-    let enhancedPrompt = prompt;
-    if (isCodeRequest) {
-      enhancedPrompt = `As a coding assistant, please help with the following request. 
-      Provide clean, well-documented code with explanations.
-      Include:
-      - Code implementation
-      - Brief explanation of the approach
-      - Best practices and considerations
-      - Any important notes about error handling or edge cases
-      
-      Request: ${prompt}`;
-    } else if (isTranslationRequest) {
-      enhancedPrompt = `As a multilingual assistant, please translate the following text accurately while preserving meaning and context:
-      
-      Text: ${prompt}
-      
-      If the target language isn't specified, please ask which language to translate to.`;
-    } else if (voice === "assistant" || isVoiceInput) {
-      enhancedPrompt = `As CHICHA, a helpful virtual assistant, please respond in a friendly, conversational tone to the following:
-      
-      ${prompt}
-      
-      Provide concise but comprehensive responses that are easy to understand when spoken aloud. Use natural language that flows well in conversation. Keep responses under 3 paragraphs for better voice delivery.`;
+    const apiKey = Deno.env.get('GEMINI_API_KEY');
+    if (!apiKey) {
+      throw new Error('GEMINI_API_KEY is not set');
     }
 
-    console.log("Sending request to Gemini API with prompt:", enhancedPrompt);
-    
-    // Generate content with the correct model format
-    const result = await model.generateContent({
+    const { prompt, imageUrl } = await req.json();
+    console.log('Received request with prompt:', prompt);
+
+    let systemContext = "You are CHICHA, a helpful AI assistant. Provide concise answers in 10-15 lines maximum. If applicable, use numbered points. Avoid special characters and only mention dates/times if specifically asked. Focus on the most relevant information.";
+
+    const requestBody = {
       contents: [{
-        parts: [{ text: enhancedPrompt }]
-      }],
-      generationConfig: {
-        maxOutputTokens: 1000,
-      },
-    });
+        parts: [{
+          text: `${systemContext}\n\nUser's question: ${prompt}`
+        }]
+      }]
+    };
 
-    let response = result.response.text();
-    console.log("Generated response:", response);
-
-    // Translate the response if targetLanguage is provided
-    if (targetLanguage) {
-      console.log(`Translating response to ${targetLanguage}`);
-      try {
-        const translationResult = await translateText(response, targetLanguage);
-        
-        if (translationResult.translatedText) {
-          console.log("Translation successful");
-          response = translationResult.translatedText;
-        } else if (translationResult.error) {
-          console.error("Translation error:", translationResult.error);
-          // Continue with original response if translation fails
-        }
-      } catch (translationError) {
-        console.error("Error during translation:", translationError);
-        // Continue with original response if translation fails
+    if (imageUrl) {
+      console.log('Processing image URL:', imageUrl);
+      const imageResponse = await fetch(imageUrl);
+      if (!imageResponse.ok) {
+        throw new Error(`Failed to fetch image: ${imageResponse.statusText}`);
       }
+      const imageData = await imageResponse.blob();
+      const base64Image = await blobToBase64(imageData);
+      
+      requestBody.contents[0].parts.push({
+        inlineData: {
+          mimeType: imageData.type,
+          data: base64Image
+        }
+      });
     }
+
+    console.log('Sending request to Gemini API');
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Gemini API error response:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
+      });
+      throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('Received response from Gemini API:', data);
+
+    if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
+      throw new Error('Invalid response format from Gemini API');
+    }
+
+    const result = data.candidates[0].content.parts[0].text;
+    const urlPattern = /(https?:\/\/[^\s]+)/g;
+    const urls = result.match(urlPattern) || [];
+
+    const sources = urls.map(url => {
+      try {
+        const domain = new URL(url).hostname;
+        return {
+          title: domain,
+          url: url,
+          domain: domain,
+          icon: `https://www.google.com/s2/favicons?domain=${domain}`
+        };
+      } catch (e) {
+        console.error('Error processing URL:', e);
+        return null;
+      }
+    }).filter(Boolean);
 
     return new Response(
-      JSON.stringify({
-        response: response,
+      JSON.stringify({ 
+        response: result,
+        sources: sources.length > 0 ? sources : undefined
       }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      { 
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        } 
       }
     );
   } catch (error) {
-    console.error("Error:", error);
+    console.error('Error in chat-with-gemini function:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      {
+      { 
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        } 
       }
     );
   }
 });
+
+async function blobToBase64(blob: Blob): Promise<string> {
+  const buffer = await blob.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}

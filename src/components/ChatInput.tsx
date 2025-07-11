@@ -1,124 +1,272 @@
-import { useState, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Textarea } from "./ui/textarea";
+import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "./ui/use-toast";
 import { ImagePreview } from "./chat/ImagePreview";
 import { InputActions } from "./chat/InputActions";
-import { LanguageSelector } from "./chat/LanguageSelector";
-import { useImageUpload } from "@/hooks/useImageUpload";
-import { useVoiceInput } from "@/hooks/useVoiceInput";
-import { useMessageHandlers } from "@/hooks/useMessageHandlers";
-import { MessageProcessor } from "./chat/MessageProcessor";
-import { Button } from "./ui/button";
-import { Mic, MicOff, Wand2, Image, Scissors, Paperclip, Send, Globe, Search } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { VoiceAssistant } from "./VoiceAssistant";
-import { ChildhoodMemoryGeneratorHF } from "./ChildhoodMemoryGeneratorHF";
 
 interface ChatInputProps {
-  onSend: (message: string, options?: {
-    targetLanguage?: string;
-  }) => void;
+  onSend: (message: string, imageUrl?: string) => void;
   isLoading?: boolean;
-  onImageSelect?: (file: File | null) => void;
+  onImageSelect?: (file: File) => void;
 }
 
-export const ChatInput = ({
-  onSend,
-  isLoading,
-  onImageSelect
-}: ChatInputProps) => {
+export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) => {
   const [message, setMessage] = useState("");
-  const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
-  const [isImageEditMode, setIsImageEditMode] = useState(false);
-  const [isWebSearchEnabled, setIsWebSearchEnabled] = useState(false);
-  
-  const {
-    imageFiles,
-    imagePreviews,
-    fileInputRef,
-    handleImageSelect,
-    handleRemoveImage,
-    clearImages
-  } = useImageUpload();
-  const {
-    isVoiceInputActive,
-    isRecording,
-    isListening,
-    toggleVoiceInput,
-    startListening,
-    stopListening
-  } = useVoiceInput(setMessage);
-  const {
-    isGeneratingImage,
-    isEditingImage,
-    handleNavigateClick,
-    handleGenerateImage,
-    handleEditImage,
-    handleWebSearch,
-    handleGenerateCode,
-    handleWeatherClick,
-    handleMapClick,
-    handleImageClick
-  } = useMessageHandlers(onSend, setMessage);
-  const {
-    processMessage
-  } = MessageProcessor({
-    onSend
-  });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+
+  const { 
+    transcript, 
+    isListening, 
+    startListening, 
+    stopListening,
+    isError,
+    errorMessage 
+  } = useSpeechRecognition();
+
+  useEffect(() => {
+    if (transcript && transcript.trim()) {
+      setMessage(prev => prev + (prev ? ' ' : '') + transcript);
+    }
+  }, [transcript]);
+
+  useEffect(() => {
+    if (isError) {
+      toast({
+        title: "Speech Recognition Error",
+        description: errorMessage || "An error occurred with speech recognition",
+        variant: "destructive",
+      });
+    }
+  }, [isError, errorMessage, toast]);
+
+  const handleNavigateClick = () => {
+    setMessage("Please enter your starting location and destination in this format: 'From: [location] To: [destination]'");
+  };
+
+  const handleGenerateImage = async () => {
+    if (!message.trim()) return;
+
+    setIsGeneratingImage(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-image', {
+        body: { prompt: message }
+      });
+
+      if (error) throw error;
+
+      if (data.image) {
+        onSend(`🎨 Generated image for "${message}": ![Generated Image](${data.image})`);
+        setMessage("");
+      }
+    } catch (error) {
+      console.error('Image generation error:', error);
+      toast({
+        title: "Generation Error",
+        description: "Failed to generate image. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
+
+  const handleWeatherClick = () => {
+    setMessage("What's the weather in [location]?");
+  };
 
   const handleSend = useCallback(async () => {
-    if (!message.trim() && imageFiles.length === 0) return;
-    
-    // If web search is enabled, prepend /search to the message
-    let finalMessage = message;
-    if (isWebSearchEnabled && !message.startsWith('/search')) {
-      finalMessage = `/search ${message}`;
+    if (!message.trim() && !imageFile) return;
+
+    // Check if the message is a navigation request
+    const navigationMatch = message.match(/From:\s*([^To]+)\s*To:\s*(.+)/i);
+    if (navigationMatch) {
+      const [, from, to] = navigationMatch;
+      const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(from.trim())}&destination=${encodeURIComponent(to.trim())}`;
+      onSend(`🗺️ Here's your route: [Open in Google Maps](${googleMapsUrl})`);
+      setMessage("");
+      return;
     }
-    
-    let imageUrls: string[] = [];
-    if (imageFiles.length > 0) {
+
+    let imageUrl = "";
+    if (imageFile) {
       try {
-        for (const file of imageFiles) {
-          const fileExt = file.name.split('.').pop();
-          const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-          const {
-            data: uploadData,
-            error: uploadError
-          } = await supabase.storage.from("images").upload(`chat/${fileName}`, file, {
-            contentType: file.type,
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from("images")
+          .upload(`chat/${fileName}`, imageFile, {
+            contentType: imageFile.type,
             upsert: false
           });
-          if (uploadError) throw uploadError;
-          const {
-            data: {
-              publicUrl
-            }
-          } = supabase.storage.from("images").getPublicUrl(uploadData.path);
-          imageUrls.push(publicUrl);
-        }
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from("images")
+          .getPublicUrl(uploadData.path);
+        
+        imageUrl = publicUrl;
       } catch (error) {
         console.error('Image upload error:', error);
+        toast({
+          title: "Upload Error",
+          description: "Failed to upload image. Please try again.",
+          variant: "destructive",
+        });
         return;
       }
     }
 
-    if (isImageEditMode && imageUrls.length > 0 && message.trim()) {
-      await handleEditImage(message, imageUrls[0]);
-      setMessage("");
-      clearImages();
-      setIsImageEditMode(false);
-      setIsWebSearchEnabled(false);
+    // Check if the message is asking about weather
+    const weatherKeywords = ['weather', 'temperature', 'forecast'];
+    const isWeatherQuery = weatherKeywords.some(keyword => 
+      message.toLowerCase().includes(keyword)
+    );
+
+    if (isWeatherQuery) {
+      try {
+        // Extract location from the message
+        const locationMatch = message.match(/(?:weather|temperature|forecast)\s+(?:in|at|for)\s+([^?.,]+)/i);
+        const location = locationMatch ? locationMatch[1].trim() : null;
+
+        if (!location) {
+          onSend("I couldn't determine the location. Please specify a location, for example: 'What's the weather in London?'");
+          return;
+        }
+
+        onSend(`🔍 Checking weather for ${location}...`);
+        
+        const { data, error } = await supabase.functions.invoke('get-weather', {
+          body: { location },
+        });
+
+        if (error) throw error;
+        
+        if (data.message) {
+          onSend(data.message);
+        } else {
+          onSend("Sorry, I couldn't fetch the weather information at this time.");
+        }
+      } catch (error) {
+        console.error('Weather fetch error:', error);
+        toast({
+          title: "Weather Error",
+          description: "Failed to fetch weather information. Please try again.",
+          variant: "destructive",
+        });
+      }
       return;
     }
 
-    const handled = await processMessage(finalMessage, imageUrls, selectedLanguage);
+    // Check if the message contains keywords indicating a request for real-time information
+    const realTimeKeywords = ['current', 'latest', 'news', 'today', 'now', 'recent', 'update'];
+    const shouldSearchWeb = realTimeKeywords.some(keyword => 
+      message.toLowerCase().includes(keyword)
+    );
 
+    if (shouldSearchWeb) {
+      try {
+        onSend(`🔍 Searching for real-time information about: ${message}`);
+        
+        const { data, error } = await supabase.functions.invoke('web-search', {
+          body: { query: message },
+        });
+
+        if (error) throw error;
+        
+        if (data && data.results) {
+          const resultsMessage = data.results
+            .map((result: any) => `${result.title}\n${result.url}\n${result.snippet}`)
+            .join('\n\n');
+          onSend(resultsMessage);
+        }
+      } catch (error) {
+        console.error('Web search error:', error);
+        toast({
+          title: "Search Error",
+          description: "Failed to fetch real-time information. Please try again.",
+          variant: "destructive",
+        });
+      }
+    }
+
+    onSend(message, imageUrl);
     setMessage("");
-    clearImages();
-    setSelectedLanguage(null);
-    setIsImageEditMode(false);
-    setIsWebSearchEnabled(false);
-  }, [message, imageFiles, onSend, selectedLanguage, processMessage, clearImages, isImageEditMode, handleEditImage, isWebSearchEnabled]);
+    setImageFile(null);
+    setImagePreview(null);
+  }, [message, imageFile, onSend, toast]);
+
+  const handleWebSearch = async () => {
+    if (!message.trim()) return;
+    
+    try {
+      onSend(`🔍 Searching the web for: ${message}`);
+      
+      const { data, error } = await supabase.functions.invoke('web-search', {
+        body: { query: message },
+      });
+
+      if (error) throw error;
+      
+      if (data && data.results) {
+        const resultsMessage = data.results
+          .map((result: any) => `${result.title}\n${result.url}\n${result.snippet}`)
+          .join('\n\n');
+        onSend(resultsMessage);
+      } else {
+        onSend("No results found for your search.");
+      }
+    } catch (error) {
+      console.error('Web search error:', error);
+      toast({
+        title: "Search Error",
+        description: "Failed to perform web search. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Invalid File",
+          description: "Please select an image file.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const MAX_SIZE = 5 * 1024 * 1024;
+      if (file.size > MAX_SIZE) {
+        toast({
+          title: "File Too Large",
+          description: "Please select an image under 5MB.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setImageFile(file);
+      if (onImageSelect) {
+        onImageSelect(file);
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -127,138 +275,48 @@ export const ChatInput = ({
     }
   };
 
-  const toggleImageEditMode = () => {
-    setIsImageEditMode(!isImageEditMode);
-    if (!isImageEditMode) {
-      setMessage("Edit this image to ");
-    }
-  };
-
-  const handleVoiceAssistantMessage = (voiceMessage: string) => {
-    setMessage(voiceMessage);
-  };
-
-  const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setMessage(e.target.value);
-  };
-
-  const toggleWebSearch = () => {
-    setIsWebSearchEnabled(!isWebSearchEnabled);
-  };
-
   return (
-    <div className="flex flex-col gap-2" role="region" aria-label="Message input">
-      {imagePreviews.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap gap-2">
-            {imagePreviews.map((preview, index) => (
-              <ImagePreview 
-                key={index} 
-                imagePreview={preview} 
-                onClear={() => handleRemoveImage(index)} 
-              />
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <Button 
-              variant={isImageEditMode ? "default" : "secondary"} 
-              size="sm" 
-              onClick={toggleImageEditMode} 
-              disabled={isEditingImage} 
-              className="flex items-center gap-1"
-            >
-              <Scissors className="h-4 w-4" />
-              {isImageEditMode ? "Editing Mode ON" : "Edit This Image"}
-            </Button>
-          </div>
-          
-          {isImageEditMode && (
-            <div className="p-2 bg-gray-100 rounded-md text-sm">
-              <p className="font-medium">Image Edit Mode</p>
-              <p className="text-gray-600">
-                Describe how you want to edit the image above, then press Send
-              </p>
-            </div>
-          )}
-        </div>
+    <div className="flex flex-col gap-2 p-4 border-t bg-background rounded-lg shadow-sm" role="region" aria-label="Message input">
+      {imagePreview && (
+        <ImagePreview 
+          imagePreview={imagePreview}
+          onClear={() => {
+            setImageFile(null);
+            setImagePreview(null);
+          }}
+        />
       )}
-
-      {/* Enhanced Web Search Toggle */}
-      {message.trim() && (
-        <div className="flex items-center gap-2 px-2">
-          <div className="flex items-center gap-2">
-            <div 
-              className={`flex items-center gap-2 px-3 py-2 rounded-full cursor-pointer transition-all duration-200 ${
-                isWebSearchEnabled 
-                  ? 'bg-teal-100 text-teal-700 border-2 border-teal-300 shadow-sm' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-2 border-transparent'
-              }`}
-              onClick={toggleWebSearch}
-            >
-              <Search className="h-4 w-4" />
-              <span className="text-sm font-medium">
-                {isWebSearchEnabled ? 'Web Search ON' : 'Enable Web Search'}
-              </span>
-            </div>
-            {isWebSearchEnabled && (
-              <div className="text-xs text-teal-600 bg-teal-50 px-2 py-1 rounded">
-                Your message will search the web
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-      
-      <div className="relative flex items-center gap-2 p-2 border border-gray-200 rounded-lg bg-white">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => fileInputRef.current?.click()}
-          className="h-8 w-8 text-gray-500 hover:text-gray-700"
-          aria-label="Attach file"
-        >
-          <Paperclip className="h-4 w-4" />
-        </Button>
-        
-        <Textarea 
-          value={message} 
-          onChange={handleMessageChange} 
-          onKeyDown={handleKeyDown} 
-          placeholder={
-            isRecording 
-              ? "Recording... speak now" 
-              : isImageEditMode 
-                ? "Describe how to edit the image..." 
-                : imageFiles.length > 0 
-                  ? "Ask about the images..." 
-                  : isWebSearchEnabled
-                    ? "Enter your search query..."
-                    : "Ask CHICHA... or type /search <your query>"
-          }
-          className="min-h-[40px] max-h-[120px] resize-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 flex-1 bg-transparent"
+      <div className="flex flex-col gap-2">
+        <Textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Message CHICHA... (Use words like 'current', 'latest', or 'today' for real-time information)"
+          className="min-h-[20px] max-h-[200px] resize-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
           rows={1}
           aria-label="Message input"
         />
-        
-        <Button
-          onClick={handleSend}
-          disabled={isLoading || (!message.trim() && imageFiles.length === 0)}
-          size="icon"
-          className="h-10 w-10 bg-teal-500 hover:bg-teal-600 text-white rounded-lg"
-          aria-label="Send message"
-        >
-          <Send className="h-4 w-4" />
-        </Button>
+        <InputActions
+          onImageClick={() => fileInputRef.current?.click()}
+          onSearchClick={handleWebSearch}
+          onMicClick={isListening ? stopListening : startListening}
+          onSendClick={handleSend}
+          onGenerateImage={handleGenerateImage}
+          onWeatherClick={handleWeatherClick}
+          onNavigateClick={handleNavigateClick}
+          isListening={isListening}
+          isLoading={!!isLoading}
+          isGeneratingImage={isGeneratingImage}
+          hasContent={!!message.trim() || !!imageFile}
+        />
       </div>
-      
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        onChange={handleImageSelect} 
-        accept="image/*" 
-        multiple 
-        className="hidden" 
-        aria-label="Upload images" 
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleImageSelect}
+        accept="image/*"
+        className="hidden"
+        aria-label="Upload image"
       />
     </div>
   );

@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 
 const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -9,7 +8,6 @@ export const useSpeechRecognition = () => {
   const [isError, setIsError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [recognition, setRecognition] = useState<any>(null);
-  const [currentLanguage, setCurrentLanguage] = useState('en-US');
 
   useEffect(() => {
     if (!SpeechRecognition) {
@@ -18,52 +16,47 @@ export const useSpeechRecognition = () => {
       return;
     }
 
-    const createRecognitionInstance = () => {
-      const recognitionInstance = new SpeechRecognition();
-      recognitionInstance.continuous = true;
-      recognitionInstance.interimResults = true;
-      recognitionInstance.lang = currentLanguage;
+    const recognitionInstance = new SpeechRecognition();
+    recognitionInstance.continuous = true;
+    recognitionInstance.interimResults = true;
+    recognitionInstance.lang = 'en-US';
 
-      recognitionInstance.onstart = () => {
-        setIsListening(true);
-        setTranscript('');
-      };
-
-      recognitionInstance.onend = () => {
-        setIsListening(false);
-      };
-
-      recognitionInstance.onerror = (event: any) => {
-        setIsError(true);
-        setErrorMessage(event.error);
-        setIsListening(false);
-      };
-
-      recognitionInstance.onresult = (event: any) => {
-        let finalTranscript = '';
-        for (let i = 0; i < event.results.length; i++) {
-          const result = event.results[i];
-          if (result.isFinal) {
-            finalTranscript += result[0].transcript;
-          }
-        }
-        if (finalTranscript) {
-          setTranscript(finalTranscript);
-        }
-      };
-
-      return recognitionInstance;
+    recognitionInstance.onstart = () => {
+      setIsListening(true);
+      setTranscript('');
     };
 
-    const recognitionInstance = createRecognitionInstance();
+    recognitionInstance.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionInstance.onerror = (event: any) => {
+      setIsError(true);
+      setErrorMessage(event.error);
+      setIsListening(false);
+    };
+
+    recognitionInstance.onresult = (event: any) => {
+      let finalTranscript = '';
+      for (let i = 0; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          finalTranscript += result[0].transcript;
+        }
+      }
+      if (finalTranscript) {
+        setTranscript(finalTranscript);
+      }
+    };
+
     setRecognition(recognitionInstance);
 
     return () => {
-      if (recognitionInstance && isListening) {
+      if (recognitionInstance) {
         recognitionInstance.stop();
       }
     };
-  }, [currentLanguage]);
+  }, []);
 
   const startListening = useCallback(() => {
     if (recognition) {
@@ -79,18 +72,6 @@ export const useSpeechRecognition = () => {
     }
   }, [recognition]);
 
-  const setLanguage = useCallback((languageCode: string) => {
-    // Stop current recognition if running
-    if (isListening && recognition) {
-      recognition.stop();
-    }
-    
-    // Update language
-    setCurrentLanguage(languageCode);
-    
-    // Language will be applied when recognition is reinitialized in the useEffect
-  }, [isListening, recognition]);
-
   return {
     isListening,
     transcript,
@@ -98,7 +79,5 @@ export const useSpeechRecognition = () => {
     errorMessage,
     startListening,
     stopListening,
-    setLanguage,
-    currentLanguage
   };
 };
