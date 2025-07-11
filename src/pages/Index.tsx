@@ -233,28 +233,76 @@ const Index = () => {
         body: { prompt: content, imageUrl },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw error;
+      }
 
+      // Handle case where function returns an error but with 200 status
+      if (data?.error) {
+        console.error('Gemini API error:', data.error);
+        // If it's a service error, use the response field as fallback
+        const responseText = data.response || "I apologize, but I'm having trouble processing your request right now. Please try again.";
+        
+        setMessages((prev) => [
+          ...prev.slice(0, -1),
+          { content: responseText, isBot: true },
+        ]);
+        
+        await supabase
+          .from('messages')
+          .insert({
+            chat_id: currentChatId,
+            content: responseText,
+            is_bot: true,
+          });
+        return;
+      }
+
+      // Normal successful response
+      const responseText = data.response || "I received your message but couldn't generate a proper response.";
+      
       await supabase
         .from('messages')
         .insert({
           chat_id: currentChatId,
-          content: data.response,
+          content: responseText,
           is_bot: true,
         });
 
       setMessages((prev) => [
         ...prev.slice(0, -1),
-        { content: data.response, isBot: true, sources: data.sources || [] },
+        { content: responseText, isBot: true, sources: data.sources || [] },
       ]);
     } catch (error) {
       console.error('Error calling Gemini:', error);
+      
+      const errorMessage = "Sorry, I'm experiencing some technical difficulties. Please try again in a moment.";
+      
+      // Show error message to user
+      setMessages((prev) => [
+        ...prev.slice(0, -1),
+        { content: errorMessage, isBot: true },
+      ]);
+      
+      // Save error message to database
+      try {
+        await supabase
+          .from('messages')
+          .insert({
+            chat_id: currentChatId,
+            content: errorMessage,
+            is_bot: true,
+          });
+      } catch (dbError) {
+        console.error('Error saving error message:', dbError);
+      }
+      
       toast({
-        title: "Error",
-        description: "Failed to get response from AI",
+        title: "Connection Issue",
+        description: "Having trouble connecting to AI service. Please check your API key configuration.",
         variant: "destructive",
       });
-      setMessages((prev) => prev.slice(0, -1));
     } finally {
       setIsLoading(false);
     }
