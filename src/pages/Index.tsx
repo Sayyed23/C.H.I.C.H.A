@@ -194,11 +194,11 @@ const Index = () => {
     }
   };
 
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = async (content: string, passedImageUrl?: string, enhancedMessage?: string) => {
     if (!currentChatId) return;
 
-    let imageUrl = null;
-    if (selectedImage) {
+    let imageUrl = passedImageUrl;
+    if (selectedImage && !imageUrl) {
       try {
         imageUrl = await handleImageUpload(selectedImage);
         setSelectedImage(null);
@@ -230,7 +230,7 @@ const Index = () => {
         });
 
       const { data, error } = await supabase.functions.invoke('chat-with-gemini', {
-        body: { prompt: content, imageUrl },
+        body: { prompt: enhancedMessage || content, imageUrl },
       });
 
       if (error) {

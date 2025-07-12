@@ -7,7 +7,7 @@ import { ImagePreview } from "./chat/ImagePreview";
 import { InputActions } from "./chat/InputActions";
 
 interface ChatInputProps {
-  onSend: (message: string, imageUrl?: string) => void;
+  onSend: (message: string, imageUrl?: string, enhancedMessage?: string) => void;
   isLoading?: boolean;
   onImageSelect?: (file: File) => void;
 }
@@ -194,7 +194,7 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
             .map((result: any) => `Title: ${result.title}\nURL: ${result.url}\nSnippet: ${result.snippet}`)
             .join('\n\n---\n\n');
           
-          // Send enhanced message with search context to AI
+          // Create enhanced message for AI but show original message to user
           const enhancedMessage = `Based on the following current web search results, please provide a comprehensive answer to: "${message}"
 
 Search Results:
@@ -202,7 +202,8 @@ ${searchContext}
 
 Please synthesize this information to provide an accurate, up-to-date response.`;
           
-          onSend(enhancedMessage, imageUrl);
+          // Show user's original message while sending enhanced version to AI
+          onSend(message, imageUrl, enhancedMessage);
           setMessage("");
           setImageFile(null);
           setImagePreview(null);
@@ -230,7 +231,7 @@ Please synthesize this information to provide an accurate, up-to-date response.`
       });
 
       if (error || !data || !data.results || data.results.length === 0) {
-        onSend(`I couldn't find current web information about "${message}". Let me provide you with general information instead.`);
+        onSend(message);
         setMessage("");
         return;
       }
@@ -241,7 +242,7 @@ Please synthesize this information to provide an accurate, up-to-date response.`
           .map((result: any) => `Title: ${result.title}\nURL: ${result.url}\nSnippet: ${result.snippet}`)
           .join('\n\n---\n\n');
         
-        // Send enhanced message with search context to AI
+        // Create enhanced message for AI but show original message to user
         const enhancedMessage = `Based on the following current web search results, please provide a comprehensive answer to: "${message}"
 
 Search Results:
@@ -249,12 +250,13 @@ ${searchContext}
 
 Please synthesize this information to provide an accurate, up-to-date response.`;
         
-        onSend(enhancedMessage);
+        // Show user's original message while sending enhanced version to AI
+        onSend(message, undefined, enhancedMessage);
         setMessage("");
       }
     } catch (error) {
       console.error('Web search error:', error);
-      onSend(`I encountered an issue searching for "${message}". Let me help with general information instead.`);
+      onSend(message);
       setMessage("");
     }
   };
