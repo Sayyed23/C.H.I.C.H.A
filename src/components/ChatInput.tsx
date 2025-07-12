@@ -173,8 +173,7 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
 
     if (shouldSearchWeb) {
       try {
-        onSend(`🔍 Searching for real-time information about: ${message}`);
-        
+        // Send the search query to AI with web search context
         const { data, error } = await supabase.functions.invoke('web-search', {
           body: { query: message },
         });
@@ -190,10 +189,20 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
         }
         
         if (data && data.results && data.results.length > 0) {
-          const resultsMessage = data.results
-            .map((result: any) => `${result.title}\n${result.url}\n${result.snippet}`)
-            .join('\n\n');
-          onSend(resultsMessage);
+          // Format search results for AI context
+          const searchContext = data.results
+            .map((result: any) => `Title: ${result.title}\nURL: ${result.url}\nSnippet: ${result.snippet}`)
+            .join('\n\n---\n\n');
+          
+          // Send enhanced message with search context to AI
+          const enhancedMessage = `Based on the following current web search results, please provide a comprehensive answer to: "${message}"
+
+Search Results:
+${searchContext}
+
+Please synthesize this information to provide an accurate, up-to-date response.`;
+          
+          onSend(enhancedMessage, imageUrl);
           setMessage("");
           setImageFile(null);
           setImagePreview(null);
@@ -216,26 +225,37 @@ export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) 
     if (!message.trim()) return;
     
     try {
-      onSend(`🔍 Searching the web for: ${message}`);
-      
       const { data, error } = await supabase.functions.invoke('web-search', {
         body: { query: message },
       });
 
       if (error || !data || !data.results || data.results.length === 0) {
-        onSend("No results found for your search. Let me try to help with general information.");
+        onSend(`I couldn't find current web information about "${message}". Let me provide you with general information instead.`);
+        setMessage("");
         return;
       }
       
       if (data && data.results) {
-        const resultsMessage = data.results
-          .map((result: any) => `${result.title}\n${result.url}\n${result.snippet}`)
-          .join('\n\n');
-        onSend(resultsMessage);
+        // Format search results for AI context
+        const searchContext = data.results
+          .map((result: any) => `Title: ${result.title}\nURL: ${result.url}\nSnippet: ${result.snippet}`)
+          .join('\n\n---\n\n');
+        
+        // Send enhanced message with search context to AI
+        const enhancedMessage = `Based on the following current web search results, please provide a comprehensive answer to: "${message}"
+
+Search Results:
+${searchContext}
+
+Please synthesize this information to provide an accurate, up-to-date response.`;
+        
+        onSend(enhancedMessage);
+        setMessage("");
       }
     } catch (error) {
       console.error('Web search error:', error);
-      onSend("Search failed, but I can still help with general information about your query.");
+      onSend(`I encountered an issue searching for "${message}". Let me help with general information instead.`);
+      setMessage("");
     }
   };
 
