@@ -10,9 +10,11 @@ interface ChatInputProps {
   onSend: (message: string, imageUrl?: string, enhancedMessage?: string) => void;
   isLoading?: boolean;
   onImageSelect?: (file: File) => void;
+  readAloudEnabled?: boolean;
+  onToggleReadAloud?: () => void;
 }
 
-export const ChatInput = ({ onSend, isLoading, onImageSelect }: ChatInputProps) => {
+export const ChatInput = ({ onSend, isLoading, onImageSelect, readAloudEnabled, onToggleReadAloud }: ChatInputProps) => {
   const [message, setMessage] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -336,6 +338,8 @@ Please synthesize this information to provide an accurate, up-to-date response.`
           isLoading={!!isLoading}
           isGeneratingImage={isGeneratingImage}
           hasContent={!!message.trim() || !!imageFile}
+          readAloudEnabled={readAloudEnabled}
+          onToggleReadAloud={onToggleReadAloud}
         />
       </div>
       <input

@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { LogOut, Plus, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { useTextToSpeech } from "@/hooks/useTextToSpeech";
 
 interface Message {
   content: string;
@@ -36,6 +37,7 @@ const Index = () => {
   const [isButtonVisible, setIsButtonVisible] = useState(true);
   const { toast } = useToast();
   const { transcript, isListening, startListening, stopListening } = useSpeechRecognition();
+  const { isSupported: ttsSupported, enabled: readAloudEnabled, setEnabled: setReadAloudEnabled, speak, stop } = useTextToSpeech();
 
   useEffect(() => {
     const initializeChat = async () => {
@@ -431,6 +433,14 @@ const Index = () => {
             onSend={handleSendMessage} 
             isLoading={isLoading} 
             onImageSelect={setSelectedImage}
+            readAloudEnabled={readAloudEnabled}
+            onToggleReadAloud={() => {
+              if (!ttsSupported) {
+                toast({ title: "Not supported", description: "Text-to-speech is not supported in this browser.", variant: "destructive" });
+                return;
+              }
+              setReadAloudEnabled(!readAloudEnabled);
+            }}
           />
         </div>
 

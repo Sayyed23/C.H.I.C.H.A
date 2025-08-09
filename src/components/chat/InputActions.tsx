@@ -1,6 +1,6 @@
 import React from "react";
 import { Button } from "../ui/button";
-import { Paperclip, Globe, Send, Mic, Wand2, Thermometer, Navigation2 } from "lucide-react";
+import { Paperclip, Globe, Send, Mic, Wand2, Thermometer, Navigation2, Volume2, VolumeX } from "lucide-react";
 
 interface InputActionsProps {
   onImageClick: () => void;
@@ -14,6 +14,8 @@ interface InputActionsProps {
   isLoading: boolean;
   isGeneratingImage: boolean;
   hasContent: boolean;
+  readAloudEnabled?: boolean;
+  onToggleReadAloud?: () => void;
 }
 
 export const InputActions = ({
@@ -28,6 +30,8 @@ export const InputActions = ({
   isLoading,
   isGeneratingImage,
   hasContent,
+  readAloudEnabled,
+  onToggleReadAloud,
 }: InputActionsProps) => {
   return (
     <div className="flex items-center gap-2">
@@ -59,6 +63,19 @@ export const InputActions = ({
           aria-label={isListening ? "Stop recording" : "Start recording"}
         >
           <Mic className="h-5 w-5" />
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={onToggleReadAloud}
+          className={`h-9 w-9 ${Boolean(readAloudEnabled) ? "bg-primary text-primary-foreground" : ""}`}
+          aria-label={readAloudEnabled ? "Disable read aloud" : "Enable read aloud"}
+        >
+          {readAloudEnabled ? (
+            <Volume2 className="h-5 w-5" />
+          ) : (
+            <VolumeX className="h-5 w-5 text-muted-foreground" />
+          )}
         </Button>
         <Button
           size="icon"
